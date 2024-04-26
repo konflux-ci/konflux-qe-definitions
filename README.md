@@ -1,0 +1,1 @@
+# konflux-qe-definitions
