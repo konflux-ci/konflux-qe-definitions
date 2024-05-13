@@ -1,0 +1,34 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: test-metadata
+spec:
+  results:
+    - name: test-event-type
+      description: "Stores information about if a job is running in Pull Request or Push event"
+  params:
+    - name: SNAPSHOT
+      description: The json string of the Snapshot under test 
+  steps:
+    - name: test-metadata
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools@sha256:ad94717d69e5d192a92b0b9b6cda4223940303f4ff297ea2b69e7cddb94ff7d5
+      env:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+      script: |
+        #!/bin/sh
+        COMPONENT_CONTAINER_IMAGE=$(echo "$SNAPSHOT" | jq -r '.components[0].containerImage')
+        GIT_REVISION=$(echo $SNAPSHOT | jq -r '.components[0].source.git.revision')
+
+        TAGS=$(skopeo inspect docker://${COMPONENT_CONTAINER_IMAGE} | jq -r '.RepoTags[]')
+
+        # Extract tag starting with "on-pr"
+        EXTRACTED_PR_TAG=$(echo "${TAGS}" | grep -oE "on-pr-${GIT_REVISION}")
+
+        if [[ -n "$EXTRACTED_PR_TAG" ]]; then
+          echo -e "[INFO] Integration tests are running in Pull Request"
+          printf pull_request | tee $(results.test-event-type.path)
+        else
+          echo -e "[INFO] Integration tests are running in the revision branch after merging"
+          printf push | tee $(results.test-event-type.path)
+        fi
