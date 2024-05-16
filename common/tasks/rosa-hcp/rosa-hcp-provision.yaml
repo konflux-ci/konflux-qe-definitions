@@ -1,0 +1,210 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: rosa-hcp-provision
+spec:
+  results:
+    - name: ocp-login-command
+      description: The command to login to the created cluster
+  params:
+    - name: ocp-version
+      type: string
+      description: ocp cluster version that you want to create
+    - name: region
+      type: string
+      description: ocp cluster region where you want to create
+    - name: cluster-name
+      type: string
+      description: ocp cluster name that you want to create
+    - name:  machine-type
+      type: string
+      description: ocp cluster machine type that you want to create
+      default: "m5.2xlarge"
+    - name: node_number
+      type: string
+      description: number of worker nodes to provision
+      default: "2"
+    - name: hcp-secrets
+      type: string
+      description: The secrets that are used to create the HCP cluster
+  steps:
+    - name: provision
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      env:
+        - name: CLUSTER_NAME
+          value: "$(params.cluster-name)"
+        - name: REGION
+          value: "$(params.region)"
+        - name: OCP_VERSION
+          value: "$(params.ocp-version)"
+        - name: MACHINE_TYPE
+          value: "$(params.machine-type)"
+        - name: ROSA_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "ROSA_TOKEN"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "AWS_ACCESS_KEY_ID"
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "AWS_SECRET_ACCESS_KEY"
+        - name: BILLING_ACCOUNT_ID
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "AWS_ACCOUNT_ID"
+        - name: AWS_OIDC_CONFIG_ID
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "AWS_OIDC_CONFIG_ID"
+        - name: OPERATOR_ROLES_PREFIX
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "OPERATOR_ROLES_PREFIX"
+        - name: SUBNET_IDS
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "SUBNET_IDS"
+        - name: INSTALL_ROLE_ARN
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "INSTALL_ROLE_ARN"
+        - name: SUPPORT_ROLE_ARN
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "SUPPORT_ROLE_ARN"
+        - name: WORKER_ROLE_ARN
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.hcp-secrets)"
+              key: "WORKER_ROLE_ARN"
+      script: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        config_aws_creds() {
+            printf "INFO: Configure AWS Credentials...\n" 
+            aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+            aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+            aws configure set region "$REGION"
+        }
+
+        print_debug_info() {
+            printf "INFO: Print debug info......\n" 
+            rosa --region "$REGION" describe cluster --cluster="$CLUSTER_NAME"
+        }
+
+        # Check all of clusteroperators are AVAILABLE
+        check_clusteroperators() {
+            operators="dns ingress network"
+            for operator in $operators; do
+                # need to check if the operator is available or not in a loop
+                retries=0
+                max_retries=25
+                # if the operator is not available, wait 60s and check again
+                while [ "$retries" -lt "$max_retries" ]; do
+                    available=$(kubectl get co "$operator" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')
+                    if [ "$available" == "True" ]; then
+                        break
+                    fi
+                    sleep 60
+                    retries=$((retries + 1))
+                    echo "Retried $retries times..."
+                done
+                # if the operator is still not available after 10 times, exit 1
+                if [ "$retries" -eq "$max_retries" ]; then
+                    echo "ERROR: Operator $operator is not available" >&2
+                    # print the status of all cluster operators
+                    kubectl get co
+                    # print the status of the failed cluster operator
+                    kubectl get co "$operator" -o yaml
+                    exit 1
+                fi
+            done
+            echo "INFO: Operators [${operators}] are available"
+            # for debugging purpose
+            kubectl get co
+        }
+
+        get_hcp_full_version() {
+            rosa_output=$(rosa list version --channel-group stable --region "$REGION" --hosted-cp -o json)
+            raw_id=$(echo "$rosa_output" | jq -r "[.[].raw_id | select(startswith(\"$OCP_VERSION\"))] | max")
+            HCP_FULL_VERSION="$raw_id"
+            if [ -z "$HCP_FULL_VERSION" ]; then
+                echo "Failed to get the HCP full version of $OCP_VERSION" >&2
+                exit 1
+            fi
+        }
+
+        deploy_cluster() {
+            printf "INFO: Log in to your Red Hat account...\n" 
+            config_aws_creds
+            rosa login --token="$ROSA_TOKEN"
+
+            printf "INFO: Create ROSA with HCP cluster...\n" 
+            get_hcp_full_version
+            rosa create cluster --cluster-name "$CLUSTER_NAME" \
+                --sts --mode=auto --oidc-config-id "$AWS_OIDC_CONFIG_ID" \
+                --operator-roles-prefix "$OPERATOR_ROLES_PREFIX" --region "$REGION" --version "$HCP_FULL_VERSION" \
+                --role-arn "$INSTALL_ROLE_ARN" \
+                --support-role-arn "$SUPPORT_ROLE_ARN" \
+                --worker-iam-role "$WORKER_ROLE_ARN" \
+                --compute-machine-type "$MACHINE_TYPE" \
+                --subnet-ids="$SUBNET_IDS" \
+                --billing-account "$BILLING_ACCOUNT_ID" \
+                --replicas $(params.node_number) \
+                --hosted-cp -y
+
+            printf "INFO: Track the progress of the cluster creation...\n" 
+            rosa logs install --cluster="$CLUSTER_NAME" --region "$REGION" --watch
+
+            printf "INFO: ROSA with HCP cluster is ready, create a cluster admin account for accessing the cluster\n" 
+            admin_output="$(rosa create admin --region "$REGION" --cluster="$CLUSTER_NAME")"
+
+            # Get the admin account credentials and API server URL
+            admin_user="$(echo "$admin_output" | grep -oP '(?<=--username ).*(?= --password)')"
+            admin_pass="$(echo "$admin_output" | grep -oP '(?<=--password ).*')"
+            api_url="$(echo "$admin_output" | grep -oP '(?<=oc login ).*(?= --username)')"
+
+            printf "INFO: Storing login command...\n"
+            echo "oc login $api_url --username $admin_user --password $admin_pass" > $(results.ocp-login-command.path)
+
+            # Use the admin account to login to the cluster in a loop until the account is active.
+            printf "INFO: Check if it's able to login to OCP cluster...\n"
+            max_retries=10
+            retries=0
+            
+            while ! oc login "$api_url" --username "$admin_user" --password "$admin_pass" >/dev/null 2>&1; do
+                if [ "$retries" -eq "$max_retries" ]; then
+                    echo "ERROR: Failed to login the cluster." >&2
+                    print_debug_info
+                    exit 1
+                fi
+                sleep 60
+                retries=$((retries + 1))
+                echo "Retried $retries times..."
+            done
+
+            #Workaround: Check if apiserver is ready by calling kubectl get nodes
+            printf "INFO: Check if apiserver is ready...\n"
+            if ! timeout 300s bash -c "while ! kubectl get nodes >/dev/null 2>/dev/null; do printf '.'; sleep 10; done"; then
+                echo "ERROR: API server is not ready" >&2
+                exit 1
+            fi
+            check_clusteroperators
+        }
+
+        deploy_cluster
