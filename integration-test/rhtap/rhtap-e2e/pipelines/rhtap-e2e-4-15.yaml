@@ -1,0 +1,167 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: rhtap-e2e
+spec:
+  description: "Run RHTAP e2e tests using rosa cluster."
+  params:
+    - description: 'Snapshot of the application'
+      name: SNAPSHOT
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - description: 'Test ID corresponding to a defined Konflux integration test'
+      name: test-id
+      default: ''
+    - description: 'Test name corresponding to a defined Konflux integration test'
+      name: test-name
+      default: ''
+    - description: 'Openshift version for epehmeral cluster deployment'
+      name: ocp-version
+      default: '4.15.9'
+      type: string
+    - name: test-event-type
+      default: 'none'
+      description: will indicate if a test is running in Pull Request or Push Event
+    - name: region
+      default: us-west-2
+      description: 'AWS region to provision ROSA'
+    - name: hcp-secrets
+      description: 'Secrets containing Rosa provisioning'
+      default: hcp-secrets
+  tasks:
+    - name: rosa-hcp-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/rosa/hosted-cp/rosa-hcp-metadata/rosa-hcp-metadata.yaml
+    - name: test-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/test-metadata/test-metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: test-name
+          value: $(context.pipelineRun.name)
+    - name: provision-rosa
+      runAfter:
+        - rosa-hcp-metadata
+        - test-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/rosa/hosted-cp/rosa-hcp-provision/rosa-hcp-provision.yaml
+      params:
+        - name: cluster-name
+          value: "$(tasks.rosa-hcp-metadata.results.cluster-name)"
+        - name: ocp-version
+          value: "$(params.ocp-version)"
+        - name: region
+          value: "$(params.region)"
+        - name: node_number
+          value: "3"
+        - name: hcp-secrets
+          value: "$(params.hcp-secrets)"
+    - name: rhtap-install
+      runAfter:
+        - "provision-rosa"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: integration-test/rhtap/rhtap-installer/task/rhtap-installer.yaml
+      params:
+        - name: test-name
+          value: $(context.pipelineRun.name)
+        - name: ocp-login-command
+          value: "$(tasks.provision-rosa.results.ocp-login-command)"
+    - name: rhtap-e2e-tests
+      runAfter:
+        - "rhtap-install"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: integration-test/rhtap/rhtap-e2e/task/rhtap-e2e-runner.yaml
+      params:
+        - name: test-name
+          value: $(context.pipelineRun.name)
+        - name: ocp-login-command
+          value: "$(tasks.provision-rosa.results.ocp-login-command)"
+        - name: git-repo
+          value: "$(tasks.test-metadata.results.git-repo)"
+        - name: git-url
+          value: "$(tasks.test-metadata.results.git-url)"
+        - name: git-revision
+          value: "$(tasks.test-metadata.results.git-revision)"
+        - name: oras-container
+          value: "$(tasks.test-metadata.results.oras-container)"
+  finally:
+    - name: gather-artifacts
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/gather-artifacts/upload-oras.yaml
+      params:
+        - name: test-name
+          value: $(context.pipelineRun.name)
+        - name: ocp-login-command
+          value: "$(tasks.provision-rosa.results.ocp-login-command)"
+        - name: oras-container
+          value: "$(tasks.test-metadata.results.oras-container)"
+        - name: pull-request-author
+          value: "$(tasks.test-metadata.results.pull-request-author)"
+        - name: git-revision
+          value: "$(tasks.test-metadata.results.git-revision)"
+        - name: pull-request-number
+          value: "$(tasks.test-metadata.results.pull-request-number)"
+        - name: git-repo
+          value: "$(tasks.test-metadata.results.git-repo)"
+        - name: git-org
+          value: "$(tasks.test-metadata.results.git-org)"
+    - name: deprovision-rosa
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/rosa/hosted-cp/rosa-hcp-deprovision/rosa-hcp-deprovision.yaml
+      params:
+        - name: cluster-name
+          value: "$(tasks.rosa-hcp-metadata.results.cluster-name)"
+        - name: region
+          value: "$(params.region)"
+        - name: hcp-secrets
+          value: "$(params.hcp-secrets)"

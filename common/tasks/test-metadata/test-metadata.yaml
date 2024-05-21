@@ -1,0 +1,94 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: test-metadata
+spec:
+  results:
+    - name: test-event-type
+      description: "Stores information about if a job is running in Pull Request or Push event"
+    - name: pull-request-number
+      description: "Stores information about pull request number if exists"
+    - name: git-url
+      description: "Stores information about git url from where test pipeline is coming. Can be a fork or not"
+    - name: git-revision
+      description: "Stores information about git revision from where test pipeline is coming"
+    - name: container-image
+      description: "Stores information about the container built in the revision commit"
+    - name: git-org
+      description: "Stores information about the gh org from where test is comming"
+    - name: git-repo
+      description: "Stores information about the repository from where test is comming"
+    - name: oras-container
+      description: "Container to store all test artifacts"
+    - name: pull-request-author
+      description: "Stores information about who perform the pull request event"
+  params:
+    - name: SNAPSHOT
+      description: The JSON string of the Snapshot under test
+    - name: test-name
+      type: string
+      description: ''
+  steps:
+    - name: test-metadata
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      workingDir: /workspace
+      env:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: EVENT_TYPE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/event-type']
+        - name: KONFLUX_COMPONENT_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['appstudio.openshift.io/component']
+        - name: PULL_REQUEST_NUMBER
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/pull-request']
+        - name: GIT_ORGANIZATION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/url-org']
+        - name: GIT_REPOSITORY
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/url-repository']
+        - name: PR_AUTHOR
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/sender']
+      script: |
+        #!/bin/sh
+
+        # Derive additional environment variables from SNAPSHOT
+        export GIT_URL=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .source.git.url' <<< "$SNAPSHOT")
+        export GIT_REVISION=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .source.git.revision' <<< "$SNAPSHOT")
+        export COMPONENT_CONTAINER_IMAGE=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .containerImage' <<< "$SNAPSHOT")
+
+        # Log declared environment variables
+        echo "Integration Test metadata:"
+        echo "  SNAPSHOT: $SNAPSHOT"
+        echo "  EVENT_TYPE: $EVENT_TYPE"
+        echo "  KONFLUX_COMPONENT_NAME: $KONFLUX_COMPONENT_NAME"
+        echo "  PULL_REQUEST_NUMBER: $PULL_REQUEST_NUMBER"
+        echo "  GIT_ORGANIZATION: $GIT_ORGANIZATION"
+        echo "  GIT_REPOSITORY: $GIT_REPOSITORY"
+        echo "  GIT_URL: $GIT_URL"
+        echo "  GIT_REVISION: $GIT_REVISION"
+        echo "  PR_AUTHOR: $PR_AUTHOR"
+        echo "  COMPONENT_CONTAINER_IMAGE: $COMPONENT_CONTAINER_IMAGE"
+        echo "  ORAS_STORAGE_CONTAINER: quay.io/flacatus/oras-demo:$(params.test-name)"
+
+        # Write each environment variable to its respective results:
+        echo -n "$EVENT_TYPE" > $(results.test-event-type.path)
+        echo -n "$KONFLUX_COMPONENT_NAME" > $(results.pull-request-number.path)
+        echo -n "$PULL_REQUEST_NUMBER" > $(results.pull-request-number.path)
+        echo -n "$GIT_ORGANIZATION" > $(results.git-org.path)
+        echo -n "$GIT_REPOSITORY" > $(results.git-repo.path)
+        echo -n "$COMPONENT_CONTAINER_IMAGE" > $(results.container-image.path)
+        echo -n "$GIT_URL" > $(results.git-url.path)
+        echo -n "$GIT_REVISION" > $(results.git-revision.path)
+        echo -n "$PR_AUTHOR" > $(results.pull-request-author.path)
+        echo -n quay.io/flacatus/oras-demo:$(params.test-name) > $(results.oras-container.path)

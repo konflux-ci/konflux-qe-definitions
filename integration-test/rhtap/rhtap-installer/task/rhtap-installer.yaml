@@ -1,0 +1,36 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: rhtap-install
+spec:
+  params:
+    - name: test-name
+      type: string
+    - name: ocp-login-command
+      type: string
+      description: ""
+  steps:
+    - name: install
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      env:
+        - name: TEST_NAME
+          value: $(params.test-name)
+        - name: RHTAP_CONFIGURATION
+          valueFrom:
+            secretKeyRef:
+              name: rhtap-installer-configuration
+              key: config.env
+      script: |
+        #!/bin/sh
+        echo $(params.ocp-login-command)
+        $(params.ocp-login-command)
+
+        cd "$(mktemp -d)"
+        git clone -b main https://github.com/redhat-appstudio/rhtap-installer.git .
+
+        echo "$RHTAP_CONFIGURATION" > config.sh
+        chmod +x config.sh
+        source ./config.sh
+
+        ./bin/make.sh values
+        ./bin/make.sh apply -n rhtap -- --debug --values private-values.yaml
