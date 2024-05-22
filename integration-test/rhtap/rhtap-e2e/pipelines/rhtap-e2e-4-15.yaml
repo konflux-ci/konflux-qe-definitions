@@ -95,9 +95,24 @@ spec:
           value: $(context.pipelineRun.name)
         - name: ocp-login-command
           value: "$(tasks.provision-rosa.results.ocp-login-command)"
-    - name: rhtap-e2e-tests
+    - name: sprayproxy-provision
       runAfter:
         - "rhtap-install"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/sprayproxy/sprayproxy-provision/sprayproxy-provision.yaml
+      params:
+        - name: ocp-login-command
+          value: "$(tasks.provision-rosa.results.ocp-login-command)"
+    - name: rhtap-e2e-tests
+      runAfter:
+        - "sprayproxy-provision"
       taskRef:
         resolver: git
         params:
@@ -121,7 +136,7 @@ spec:
         - name: oras-container
           value: "$(tasks.test-metadata.results.oras-container)"
   finally:
-    - name: gather-artifacts
+    - name: sprayproxy-deprovision
       taskRef:
         resolver: git
         params:
@@ -130,7 +145,17 @@ spec:
           - name: revision
             value: onboard_rhtap_e2e
           - name: pathInRepo
-            value: common/tasks/gather-artifacts/upload-oras.yaml
+            value: common/tasks/sprayproxy/sprayproxy-deprovision/sprayproxy-deprovision.yaml
+    - name: deprovision-rosa-collect-artifacts
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/rosa/hosted-cp/rosa-hcp-deprovision/rosa-hcp-deprovision.yaml
       params:
         - name: test-name
           value: $(context.pipelineRun.name)
@@ -148,17 +173,6 @@ spec:
           value: "$(tasks.test-metadata.results.git-repo)"
         - name: git-org
           value: "$(tasks.test-metadata.results.git-org)"
-    - name: deprovision-rosa
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
-          - name: revision
-            value: onboard_rhtap_e2e
-          - name: pathInRepo
-            value: common/tasks/rosa/hosted-cp/rosa-hcp-deprovision/rosa-hcp-deprovision.yaml
-      params:
         - name: cluster-name
           value: "$(tasks.rosa-hcp-metadata.results.cluster-name)"
         - name: region

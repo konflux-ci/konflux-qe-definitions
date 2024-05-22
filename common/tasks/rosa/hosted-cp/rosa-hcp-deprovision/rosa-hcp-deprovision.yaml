@@ -1,10 +1,30 @@
----
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: rosa-hcp-deprovision
+  name: save-artifacts
 spec:
   params:
+    - name: test-name
+      type: string
+    - name: ocp-login-command
+      type: string
+      description: ""
+    - name: oras-container
+      type: string
+      description: ""
+    - name: pull-request-author
+      type: string
+    - name: git-revision
+      type: string
+      description: ""
+    - name: pull-request-number
+      type: string
+    - name: git-repo
+      type: string
+      description: ""
+    - name: git-org
+      type: string
+      description: ""
     - name: cluster-name
       type: string
       description: ocp cluster name that you want to delete
@@ -15,7 +35,87 @@ spec:
       type: string
       description: The secrets that are used to create the HCP cluster
   steps:
-    - name: deprovision
+    - name: collect-artifacts
+      workingDir: /workspace/cluster-artifacts
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      script: |
+        #!/bin/sh
+        $(params.ocp-login-command)
+
+        curl -sSL https://raw.githubusercontent.com/konflux-qe-incubator/konflux-qe-definitions/onboard_rhtap_e2e/scripts/gather-extra.sh | bash
+    - name: inspect-upload-artifacts
+      workingDir: /workspace
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      env:
+        - name: QUAY_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: "oras-credentials"
+              key: "quay-username"
+        - name: QUAY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: oras-credentials
+              key: "quay-password"
+      script: |
+        #!/bin/sh
+        trufflehog filesystem /workspace --only-verified --fail
+        EXIT_CODE=$?
+
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "[ERROR] Found secrets in artifacts... Container artifacts will not be uploaded to oci registry due security reason."
+          exit 0
+        fi
+        oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
+
+        echo '{"doc": "README.md"}' > config.json
+        oras pull "$(params.oras-container)"
+        oras push "$(params.oras-container)" --config config.json:application/vnd.acme.rocket.config.v1+json \
+          ./:application/vnd.acme.rocket.docs.layer.v1+tar
+    - name: pull-request-comment
+      workingDir: /workspace
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: "github"
+              key: "token"
+      script: |
+        #!/bin/sh
+
+        export TEST_NAME="$(params.test-name)"
+        export PR_AUTHOR="$(params.pull-request-author)"
+        export GIT_REVISION="$(params.git-revision)"
+        export ORAS_CONTAINER="$(params.oras-container)"
+        export GIT_ORG="$(params.git-org)"
+        export GIT_REPO="$(params.git-repo)"
+        export PR_NUMBER="$(params.pull-request-number)"
+
+        if [ -z "$GITHUB_TOKEN" ]; then
+            echo "Error: GITHUB_TOKEN env is not set."
+            exit 1
+        fi
+
+        COMMENT=$(cat <<EOF
+        {
+          "body": "@$PR_AUTHOR: The following test finished, in case test failed say /retest to rerun all failed tests:\n\nPipelineRun name | Command\n--- | ---\n$TEST_NAME | /retest\n\nTo inspect your test artifacts make sure you have installed ORAS in your local machine. To inspect all test artifacts execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $ORAS_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
+        }
+        EOF
+        )
+
+        RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "$COMMENT" \
+            "https://api.github.com/repos/$GIT_ORG/$GIT_REPO/issues/$PR_NUMBER/comments")
+
+        if echo "$RESPONSE" | grep -q '"id"'; then
+            echo "Comment posted successfully."
+        else
+            echo "Failed to post comment. Response: $RESPONSE"
+        fi
+    - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       env:
         - name: CLUSTER_NAME
@@ -41,8 +141,6 @@ spec:
         set -o errexit
         set -o nounset
         set -o pipefail
-
-        sleep 5m
 
         config_aws_creds() {
             aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
