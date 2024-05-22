@@ -4,6 +4,8 @@ metadata:
   name: rhtap-install
 spec:
   params:
+    - name: test-id
+      type: string
     - name: test-name
       type: string
     - name: ocp-login-command
@@ -11,8 +13,10 @@ spec:
       description: ""
   steps:
     - name: install
-      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools@sha256:ad94717d69e5d192a92b0b9b6cda4223940303f4ff297ea2b69e7cddb94ff7d5
       env:
+        - name: TEST_ID
+          value: $(params.test-id)
         - name: TEST_NAME
           value: $(params.test-name)
         - name: RHTAP_CONFIGURATION
@@ -22,11 +26,12 @@ spec:
               key: config.env
       script: |
         #!/bin/sh
-        echo $(params.ocp-login-command)
         $(params.ocp-login-command)
+        oc whoami
 
-        cd "$(mktemp -d)"
-        git clone -b release-1.0.1 https://github.com/redhat-appstudio/rhtap-installer.git .
+        git clone -b release-1.0.1 https://github.com/redhat-appstudio/rhtap-installer.git
+
+        cd rhtap-installer
 
         echo "$RHTAP_CONFIGURATION" > config.sh
         chmod +x config.sh
@@ -34,3 +39,7 @@ spec:
 
         ./bin/make.sh values
         ./bin/make.sh apply -n rhtap -- --debug --values private-values.yaml
+
+        echo -e "INFO: RHTAP was installed successfully:"
+
+        oc get po -n rhtap
