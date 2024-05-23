@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: save-artifacts
+  name: collect-artifacts-deprovision-rosa
 spec:
   params:
     - name: test-name
@@ -31,12 +31,13 @@ spec:
     - name: region
       type: string
       description: ocp cluster region where you want to delete
-    - name: hcp-secrets
+    - name: aws-secrets
       type: string
       description: The secrets that are used to create the HCP cluster
   steps:
     - name: collect-artifacts
       workingDir: /workspace/cluster-artifacts
+      onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       script: |
         #!/bin/sh
@@ -45,6 +46,7 @@ spec:
         curl -sSL https://raw.githubusercontent.com/konflux-qe-incubator/konflux-qe-definitions/onboard_rhtap_e2e/scripts/gather-extra.sh | bash
     - name: inspect-upload-artifacts
       workingDir: /workspace
+      onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       env:
         - name: QUAY_USERNAME
@@ -74,6 +76,7 @@ spec:
           ./:application/vnd.acme.rocket.docs.layer.v1+tar
     - name: pull-request-comment
       workingDir: /workspace
+      onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       env:
         - name: GITHUB_TOKEN
@@ -111,9 +114,9 @@ spec:
             "https://api.github.com/repos/$GIT_ORG/$GIT_REPO/issues/$PR_NUMBER/comments")
 
         if echo "$RESPONSE" | grep -q '"id"'; then
-            echo "Comment posted successfully."
+            echo "[INFO] Comment posted successfully."
         else
-            echo "Failed to post comment. Response: $RESPONSE"
+            echo "[ERROR] Failed to post comment. Response: $RESPONSE"
         fi
     - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -123,17 +126,17 @@ spec:
         - name: ROSA_TOKEN
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "ROSA_TOKEN"
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "AWS_ACCESS_KEY_ID"
         - name: AWS_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "AWS_SECRET_ACCESS_KEY"
         - name: REGION
           value: "$(params.region)"
