@@ -26,11 +26,12 @@ spec:
         $(params.ocp-login-command)
 
         cd "$(mktemp -d)"
-        git clone -b release-1.0.1 https://github.com/redhat-appstudio/rhtap-installer.git .
+        git clone -b main https://github.com/redhat-appstudio/rhtap-installer.git .
 
         echo "$RHTAP_CONFIGURATION" > config.sh
         chmod +x config.sh
         source ./config.sh
 
         ./bin/make.sh values
+        yq e -i '.debug.ci=true' private-values.yaml
         ./bin/make.sh apply -n rhtap -- --debug --values private-values.yaml
