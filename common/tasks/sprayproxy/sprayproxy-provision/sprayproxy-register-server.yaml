@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: rosa-hcp-provision
+  name: sprayproxy-register-server
 spec:
   params:
     - name: ocp-login-command

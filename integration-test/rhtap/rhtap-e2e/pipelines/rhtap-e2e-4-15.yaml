@@ -61,6 +61,7 @@ spec:
           value: $(params.SNAPSHOT)
         - name: test-name
           value: $(context.pipelineRun.name)
+
     - name: provision-rosa
       runAfter:
         - rosa-hcp-metadata
@@ -115,7 +116,7 @@ spec:
           - name: revision
             value: onboard_rhtap_e2e
           - name: pathInRepo
-            value: common/tasks/sprayproxy/sprayproxy-provision/sprayproxy-provision.yaml
+            value: common/tasks/sprayproxy/sprayproxy-provision/sprayproxy-register-server.yaml
       params:
         - name: ocp-login-command
           value: "$(tasks.provision-rosa.results.ocp-login-command)"
@@ -187,4 +188,4 @@ spec:
           - name: revision
             value: onboard_rhtap_e2e
           - name: pathInRepo
-            value: common/tasks/sprayproxy/sprayproxy-deprovision/sprayproxy-deprovision.yaml
+            value: common/tasks/sprayproxy/sprayproxy-deprovision/sprayproxy-unregister-server.yaml
