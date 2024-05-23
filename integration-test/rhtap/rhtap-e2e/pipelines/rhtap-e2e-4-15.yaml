@@ -63,6 +63,10 @@ spec:
           value: $(context.pipelineRun.name)
 
     - name: provision-rosa
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
       runAfter:
         - rosa-hcp-metadata
         - test-metadata
@@ -89,6 +93,10 @@ spec:
         - name: aws-secrets
           value: "$(params.aws-secrets)"
     - name: rhtap-install
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
       runAfter:
         - provision-rosa
       taskRef:
@@ -106,6 +114,10 @@ spec:
         - name: ocp-login-command
           value: "$(tasks.provision-rosa.results.ocp-login-command)"
     - name: sprayproxy-provision
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
       runAfter:
         - rhtap-install
       taskRef:
@@ -121,6 +133,10 @@ spec:
         - name: ocp-login-command
           value: "$(tasks.provision-rosa.results.ocp-login-command)"
     - name: rhtap-e2e-tests
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
       runAfter:
         - sprayproxy-provision
       taskRef:
@@ -147,6 +163,10 @@ spec:
           value: "$(tasks.test-metadata.results.oras-container)"
   finally:
     - name: deprovision-rosa-collect-artifacts
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
       taskRef:
         resolver: git
         params:
@@ -180,6 +200,10 @@ spec:
         - name: aws-secrets
           value: "$(params.aws-secrets)"
     - name: sprayproxy-deprovision
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
       taskRef:
         resolver: git
         params:
