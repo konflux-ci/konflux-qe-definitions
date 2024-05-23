@@ -136,16 +136,6 @@ spec:
         - name: oras-container
           value: "$(tasks.test-metadata.results.oras-container)"
   finally:
-    - name: sprayproxy-deprovision
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
-          - name: revision
-            value: onboard_rhtap_e2e
-          - name: pathInRepo
-            value: common/tasks/sprayproxy/sprayproxy-deprovision/sprayproxy-deprovision.yaml
     - name: deprovision-rosa-collect-artifacts
       taskRef:
         resolver: git
@@ -179,3 +169,13 @@ spec:
           value: "$(params.region)"
         - name: hcp-secrets
           value: "$(params.hcp-secrets)"
+    - name: sprayproxy-deprovision
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/sprayproxy/sprayproxy-deprovision/sprayproxy-deprovision.yaml
