@@ -53,6 +53,7 @@ spec:
         #!/bin/sh
 
         function saveArtifacts() {
+          sleep 30m
           cd /workspace
           oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
 
