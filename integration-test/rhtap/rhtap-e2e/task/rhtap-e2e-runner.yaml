@@ -1,0 +1,90 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: rhtap-e2e-runner
+spec:
+  params:
+    - name: test-name
+      type: string
+    - name: ocp-login-command
+      type: string
+      description: ""
+    - name: git-repo
+      type: string
+      default: "rhtap-e2e"
+    - name: git-url
+      type: string
+      default: "https://github.com/redhat-appstudio/rhtap-e2e.git"
+    - name: git-revision
+      type: string
+      default: "main"
+    - name: oras-container
+      type: string
+      description: "OCI container to store artifacts"
+  steps:
+    - name: e2e-test
+      image: quay.io/flacatus/yarn-qe-tools:latest
+      workingDir: /workspace
+      env:
+        - name: TEST_NAME
+          value: $(params.test-name)
+        - name: GIT_REPO
+          value: $(params.git-repo)
+        - name: GIT_URL
+          value: $(params.git-url)
+        - name: GIT_REVISION
+          value: $(params.git-revision)
+        - name: QUAY_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: "oras-credentials"
+              key: "quay-username"
+        - name: QUAY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: oras-credentials
+              key: "quay-password"
+        - name: RHTAP_E2E_CONFIGURATION
+          valueFrom:
+            secretKeyRef:
+              name: rhtap-e2e-config
+              key: config.env
+      script: |
+        #!/bin/sh
+
+        function saveArtifacts() {
+          cd /workspace
+          oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
+
+          echo '{"doc": "README.md"}' > config.json
+
+          oras push "$(params.oras-container)" --config config.json:application/vnd.acme.rocket.config.v1+json \
+            ./test-artifacts/:application/vnd.acme.rocket.docs.layer.v1+tar
+
+          exit $EXIT_CODE
+        }
+
+        trap saveArtifacts EXIT
+
+        export ARTIFACT_DIR="/workspace/test-artifacts"
+        mkdir -p $ARTIFACT_DIR
+
+        echo -e "INFO: Login to ephemeral cluster..."
+        $(params.ocp-login-command)
+
+        cd "$(mktemp -d)"
+        export RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route redhat-developer-hub -n rhtap -o jsonpath='{.spec.host}')"
+
+        echo -e "INFO: cloning repo name '$(params.git-repo)' with revision '$(params.git-revision)' from url '$(params.git-url)'"
+        git clone "$(params.git-url)" .
+        
+        if [ "$(params.git-repo)" = "rhtap-e2e" ]; then
+          git checkout "$(params.git-revision)"
+        fi
+
+        echo "$RHTAP_E2E_CONFIGURATION" > config.sh
+        chmod +x config.sh
+        source ./config.sh
+
+        yarn
+        yarn test

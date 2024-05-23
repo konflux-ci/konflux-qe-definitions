@@ -1,0 +1,215 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: rhtap-e2e
+spec:
+  description: |
+    This pipeline automates the process of running end-to-end tests for RHTAP 
+    using a ROSA (Red Hat OpenShift Service on AWS) cluster. The pipeline provisions 
+    the ROSA cluster, installs RHTAP using the installer, runs the tests, collects artifacts, 
+    and finally deprovisions the ROSA cluster.
+  params:
+    - name: SNAPSHOT
+      description: 'The JSON string representing the snapshot of the application under test.'
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - name: test-name
+      description: 'The name of the test corresponding to a defined Konflux integration test.'
+      default: ''
+    - name: ocp-version
+      description: 'The OpenShift version to use for the ephemeral cluster deployment.'
+      default: '4.15.9'
+      type: string
+    - name: test-event-type
+      description: 'Indicates if the test is triggered by a Pull Request or Push event.'
+      default: 'none'
+    - name: region
+      description: 'The AWS region to provision the ROSA cluster. Default is us-west-2.'
+      default: 'us-west-2'
+    - name: aws-secrets
+      description: 'The AWS secrets used for provisioning the ROSA cluster.'
+      default: 'aws-secrets'
+    - name: replicas
+      description: 'The number of replicas for the cluster nodes.'
+      default: '3'
+    - name: machine-type
+      description: 'The type of machine to use for the cluster nodes.'
+      default: 'm5.xlarge'
+  tasks:
+    - name: rosa-hcp-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/rosa/hosted-cp/rosa-hcp-metadata/rosa-hcp-metadata.yaml
+    - name: test-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/test-metadata/test-metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: test-name
+          value: $(context.pipelineRun.name)
+
+    - name: provision-rosa
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
+      runAfter:
+        - rosa-hcp-metadata
+        - test-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/rosa/hosted-cp/rosa-hcp-provision/rosa-hcp-provision.yaml
+      params:
+        - name: cluster-name
+          value: "$(tasks.rosa-hcp-metadata.results.cluster-name)"
+        - name: ocp-version
+          value: "$(params.ocp-version)"
+        - name: region
+          value: "$(params.region)"
+        - name: replicas
+          value: "$(params.replicas)"
+        - name: machine-type
+          value: "$(params.machine-type)"
+        - name: aws-secrets
+          value: "$(params.aws-secrets)"
+    - name: rhtap-install
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
+      runAfter:
+        - provision-rosa
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: integration-test/rhtap/rhtap-installer/task/rhtap-installer.yaml
+      params:
+        - name: test-name
+          value: $(context.pipelineRun.name)
+        - name: ocp-login-command
+          value: "$(tasks.provision-rosa.results.ocp-login-command)"
+    - name: sprayproxy-provision
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
+      runAfter:
+        - rhtap-install
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/sprayproxy/sprayproxy-provision/sprayproxy-register-server.yaml
+      params:
+        - name: ocp-login-command
+          value: "$(tasks.provision-rosa.results.ocp-login-command)"
+    - name: rhtap-e2e-tests
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
+      runAfter:
+        - sprayproxy-provision
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: integration-test/rhtap/rhtap-e2e/task/rhtap-e2e-runner.yaml
+      params:
+        - name: test-name
+          value: $(context.pipelineRun.name)
+        - name: ocp-login-command
+          value: "$(tasks.provision-rosa.results.ocp-login-command)"
+        - name: git-repo
+          value: "$(tasks.test-metadata.results.git-repo)"
+        - name: git-url
+          value: "$(tasks.test-metadata.results.git-url)"
+        - name: git-revision
+          value: "$(tasks.test-metadata.results.git-revision)"
+        - name: oras-container
+          value: "$(tasks.test-metadata.results.oras-container)"
+  finally:
+    - name: deprovision-rosa-collect-artifacts
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/rosa/hosted-cp/rosa-hcp-deprovision/rosa-hcp-deprovision.yaml
+      params:
+        - name: test-name
+          value: $(context.pipelineRun.name)
+        - name: ocp-login-command
+          value: "$(tasks.provision-rosa.results.ocp-login-command)"
+        - name: oras-container
+          value: "$(tasks.test-metadata.results.oras-container)"
+        - name: pull-request-author
+          value: "$(tasks.test-metadata.results.pull-request-author)"
+        - name: git-revision
+          value: "$(tasks.test-metadata.results.git-revision)"
+        - name: pull-request-number
+          value: "$(tasks.test-metadata.results.pull-request-number)"
+        - name: git-repo
+          value: "$(tasks.test-metadata.results.git-repo)"
+        - name: git-org
+          value: "$(tasks.test-metadata.results.git-org)"
+        - name: cluster-name
+          value: "$(tasks.rosa-hcp-metadata.results.cluster-name)"
+        - name: region
+          value: "$(params.region)"
+        - name: aws-secrets
+          value: "$(params.aws-secrets)"
+    - name: sprayproxy-deprovision
+      when:
+        - input: "$(tasks.test-metadata.results.test-event-type)"
+          operator: in
+          values: ["pull_request"]
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-qe-incubator/konflux-qe-definitions.git
+          - name: revision
+            value: onboard_rhtap_e2e
+          - name: pathInRepo
+            value: common/tasks/sprayproxy/sprayproxy-deprovision/sprayproxy-unregister-server.yaml

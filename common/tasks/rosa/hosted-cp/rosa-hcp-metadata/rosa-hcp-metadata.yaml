@@ -1,12 +1,11 @@
----
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: generate-cluster-name
+  name: rosa-hcp-metadata
 spec:
   results:
     - name: cluster-name
-      description: Openshift cluster name
+      description: The generated name for the OpenShift cluster.
   steps:
     - name: generate-cluster-name
       image: registry.access.redhat.com/ubi9/openssl:9.1-2
@@ -15,6 +14,9 @@ spec:
         set -o errexit
         set -o nounset
         set -o pipefail
-        
+
+        # Generate a unique cluster name using a prefix and a random hex string
         CLUSTER_NAME="kx-$( openssl rand -hex 5 )"
+        
+        # Output the cluster name to the specified result path
         echo -n "$CLUSTER_NAME" | tee $(results.cluster-name.path)
