@@ -25,7 +25,7 @@ spec:
       type: string
       description: number of worker nodes to provision
       default: "3"
-    - name: hcp-secrets
+    - name: aws-secrets
       type: string
       description: The secrets that are used to create the HCP cluster
   steps:
@@ -43,52 +43,52 @@ spec:
         - name: ROSA_TOKEN
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "ROSA_TOKEN"
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "AWS_ACCESS_KEY_ID"
         - name: AWS_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "AWS_SECRET_ACCESS_KEY"
         - name: BILLING_ACCOUNT_ID
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "AWS_ACCOUNT_ID"
         - name: AWS_OIDC_CONFIG_ID
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "AWS_OIDC_CONFIG_ID"
         - name: OPERATOR_ROLES_PREFIX
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "OPERATOR_ROLES_PREFIX"
         - name: SUBNET_IDS
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "SUBNET_IDS"
         - name: INSTALL_ROLE_ARN
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "INSTALL_ROLE_ARN"
         - name: SUPPORT_ROLE_ARN
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "SUPPORT_ROLE_ARN"
         - name: WORKER_ROLE_ARN
           valueFrom:
             secretKeyRef:
-              name: "$(params.hcp-secrets)"
+              name: "$(params.aws-secrets)"
               key: "WORKER_ROLE_ARN"
       script: |
         set -o errexit

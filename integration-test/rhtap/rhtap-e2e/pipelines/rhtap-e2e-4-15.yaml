@@ -25,9 +25,9 @@ spec:
     - name: region
       default: us-west-2
       description: 'AWS region to provision ROSA'
-    - name: hcp-secrets
+    - name: aws-secrets
       description: 'Secrets containing Rosa provisioning'
-      default: hcp-secrets
+      default: aws-secrets
   tasks:
     - name: rosa-hcp-metadata
       taskRef:
@@ -76,8 +76,8 @@ spec:
           value: "$(params.region)"
         - name: node_number
           value: "3"
-        - name: hcp-secrets
-          value: "$(params.hcp-secrets)"
+        - name: aws-secrets
+          value: "$(params.aws-secrets)"
     - name: rhtap-install
       runAfter:
         - "provision-rosa"
@@ -167,8 +167,8 @@ spec:
           value: "$(tasks.rosa-hcp-metadata.results.cluster-name)"
         - name: region
           value: "$(params.region)"
-        - name: hcp-secrets
-          value: "$(params.hcp-secrets)"
+        - name: aws-secrets
+          value: "$(params.aws-secrets)"
     - name: sprayproxy-deprovision
       taskRef:
         resolver: git

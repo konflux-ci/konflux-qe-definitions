@@ -8,7 +8,7 @@ https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly
 [Here](../../../integration-test/rhtap/rhtap-installer/pipelines/hcp-cluster-test-pipeline.yaml) is an example about how to use tasks to provision/deprovision ROSA HCP cluster.
 
 ### Secrets
-You need to create a secret including the following data in Konflux, and pass its name to tasks as parameter `hcp-secrets` 
+You need to create a secret including the following data in Konflux, and pass its name to tasks as parameter `aws-secrets` 
 
 * AWS_ACCOUNT_ID
 * AWS_OIDC_CONFIG_ID

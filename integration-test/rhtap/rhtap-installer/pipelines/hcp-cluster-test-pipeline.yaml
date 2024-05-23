@@ -7,7 +7,7 @@ spec:
   params:
     - name: ocp-version
     - name: region
-    - name: hcp-secrets
+    - name: aws-secrets
   tasks:
     - name: generate-cluster-name
       taskRef:
@@ -40,8 +40,8 @@ spec:
           value: "$(params.region)"
         - name: node_number
           value: "4"
-        - name: hcp-secrets
-          value: "$(params.hcp-secrets)"
+        - name: aws-secrets
+          value: "$(params.aws-secrets)"
     - name: test
       runAfter:
         - provision-rosa-cluster
@@ -78,5 +78,5 @@ spec:
           value: "$(tasks.generate-cluster-name.results.cluster-name)"
         - name: region
           value: "$(params.region)"
-        - name: hcp-secrets
-          value: "$(params.hcp-secrets)"
+        - name: aws-secrets
+          value: "$(params.aws-secrets)"
