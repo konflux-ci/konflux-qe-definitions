@@ -28,6 +28,9 @@ spec:
     - name: test-name
       type: string
       description: The name of the test being executed.
+    - name: oras-container
+      type: string
+      description: The ORAS container used to store all test artifacts. From this container will generate one with test tag.
   steps:
     - name: test-metadata
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
