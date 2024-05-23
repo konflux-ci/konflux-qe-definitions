@@ -5,29 +5,29 @@ metadata:
 spec:
   results:
     - name: test-event-type
-      description: "Stores information about if a job is running in Pull Request or Push event"
+      description: Indicates if the job is triggered by a Pull Request or a Push event.
     - name: pull-request-number
-      description: "Stores information about pull request number if exists"
+      description: The pull request number if the job is triggered by a pull request event.
     - name: git-url
-      description: "Stores information about git url from where test pipeline is coming. Can be a fork or not"
+      description: The Git URL from which the test pipeline is originating. This can be from a fork or the original repository.
     - name: git-revision
-      description: "Stores information about git revision from where test pipeline is coming"
+      description: The Git revision (commit SHA) from which the test pipeline is originating.
     - name: container-image
-      description: "Stores information about the container built in the revision commit"
+      description: The container image built from the specified Git revision.
     - name: git-org
-      description: "Stores information about the gh org from where test is comming"
+      description: The GitHub organization from which the test is originating.
     - name: git-repo
-      description: "Stores information about the repository from where test is comming"
+      description: The repository from which the test is originating.
     - name: oras-container
-      description: "Container to store all test artifacts"
+      description: The ORAS container used to store all test artifacts.
     - name: pull-request-author
-      description: "Stores information about who perform the pull request event"
+      description: The GitHub author of the pull request event.
   params:
     - name: SNAPSHOT
-      description: The JSON string of the Snapshot under test
+      description: The JSON string of the Snapshot under test.
     - name: test-name
       type: string
-      description: ''
+      description: The name of the test being executed.
   steps:
     - name: test-metadata
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -62,12 +62,12 @@ spec:
       script: |
         #!/bin/sh
 
-        # Derive additional environment variables from SNAPSHOT
+        # Extract additional environment variables from SNAPSHOT
         export GIT_URL=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .source.git.url' <<< "$SNAPSHOT")
         export GIT_REVISION=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .source.git.revision' <<< "$SNAPSHOT")
         export COMPONENT_CONTAINER_IMAGE=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .containerImage' <<< "$SNAPSHOT")
 
-        # Log declared environment variables
+        # Log the derived environment variables
         echo "Integration Test metadata:"
         echo "  SNAPSHOT: $SNAPSHOT"
         echo "  EVENT_TYPE: $EVENT_TYPE"
@@ -81,9 +81,8 @@ spec:
         echo "  COMPONENT_CONTAINER_IMAGE: $COMPONENT_CONTAINER_IMAGE"
         echo "  ORAS_STORAGE_CONTAINER: quay.io/flacatus/oras-demo:$(params.test-name)"
 
-        # Write each environment variable to its respective results:
+        # Write each environment variable to its respective result file
         echo -n "$EVENT_TYPE" > $(results.test-event-type.path)
-        echo -n "$KONFLUX_COMPONENT_NAME" > $(results.pull-request-number.path)
         echo -n "$PULL_REQUEST_NUMBER" > $(results.pull-request-number.path)
         echo -n "$GIT_ORGANIZATION" > $(results.git-org.path)
         echo -n "$GIT_REPOSITORY" > $(results.git-repo.path)

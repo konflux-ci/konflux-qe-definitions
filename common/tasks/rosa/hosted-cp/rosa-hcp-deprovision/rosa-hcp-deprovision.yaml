@@ -6,36 +6,40 @@ spec:
   params:
     - name: test-name
       type: string
+      description: The name of the test being executed.
     - name: ocp-login-command
       type: string
-      description: ""
+      description: Command to log in to the OpenShift cluster.
     - name: oras-container
       type: string
-      description: ""
+      description: The ORAS container registry URI to store artifacts.
     - name: pull-request-author
       type: string
+      description: The GitHub username of the pull request author.
     - name: git-revision
       type: string
-      description: ""
+      description: The Git revision (commit SHA) of the current build.
     - name: pull-request-number
       type: string
+      description: The number of the GitHub pull request.
     - name: git-repo
       type: string
-      description: ""
+      description: The name of the GitHub repository.
     - name: git-org
       type: string
-      description: ""
+      description: The GitHub organization or user that owns the repository.
     - name: cluster-name
       type: string
-      description: ocp cluster name that you want to delete
+      description: The name of the OpenShift cluster to be deleted.
     - name: region
       type: string
-      description: ocp cluster region where you want to delete
+      description: The AWS region where the OpenShift cluster is located.
     - name: aws-secrets
       type: string
-      description: The secrets that are used to create the HCP cluster
+      description: The secrets containing AWS credentials.
   steps:
     - name: collect-artifacts
+      description: Collect artifacts from the OpenShift cluster.
       workingDir: /workspace/cluster-artifacts
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -57,7 +61,7 @@ spec:
         - name: QUAY_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: oras-credentials
+              name: "oras-credentials"
               key: "quay-password"
       script: |
         #!/bin/sh
@@ -65,7 +69,7 @@ spec:
         EXIT_CODE=$?
 
         if [ $EXIT_CODE -ne 0 ]; then
-          echo "[ERROR] Found secrets in artifacts... Container artifacts will not be uploaded to oci registry due security reason."
+          echo "[ERROR] Found secrets in artifacts... Container artifacts will not be uploaded to oci registry due to security reasons."
           exit 0
         fi
         oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
@@ -74,7 +78,9 @@ spec:
         oras pull "$(params.oras-container)"
         oras push "$(params.oras-container)" --config config.json:application/vnd.acme.rocket.config.v1+json \
           ./:application/vnd.acme.rocket.docs.layer.v1+tar
+      description: Inspect artifacts for secrets and upload them to the ORAS container registry if safe.
     - name: pull-request-comment
+      description: Post a comment on the GitHub pull request with test results and artifact inspection instructions.
       workingDir: /workspace
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -154,15 +160,15 @@ spec:
         if [[ -n "$CLUSTER_NAME"  ]]; then
             echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Started to destroy cluster [$CLUSTER_NAME]..."
 
-            printf "INFO: Log in to your Red Hat account...\n"
+            printf "INFO: Logging in to your Red Hat account...\n"
             config_aws_creds
             rosa login --token="$ROSA_TOKEN"
 
-            # Here we just trigger the deletion of the cluster, we won't wait for it to be completely deleted
+            # Trigger the deletion of the cluster without waiting for it to be completely deleted
             rosa delete cluster --region "$REGION" --cluster="$CLUSTER_NAME" -y
 
         else
-            echo "INFO: No OCP cluster need to be destroyed."
+            echo "INFO: No OCP cluster needs to be destroyed."
         fi
 
         echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Done"

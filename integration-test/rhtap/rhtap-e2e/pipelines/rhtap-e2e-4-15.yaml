@@ -3,31 +3,38 @@ kind: Pipeline
 metadata:
   name: rhtap-e2e
 spec:
-  description: "Run RHTAP e2e tests using rosa cluster."
+  description: |
+    This pipeline automates the process of running end-to-end tests for RHTAP 
+    using a ROSA (Red Hat OpenShift Service on AWS) cluster. The pipeline provisions 
+    the ROSA cluster, installs RHTAP using the installer, runs the tests, collects artifacts, 
+    and finally deprovisions the ROSA cluster.
   params:
-    - description: 'Snapshot of the application'
-      name: SNAPSHOT
+    - name: SNAPSHOT
+      description: 'The JSON string representing the snapshot of the application under test.'
       default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
       type: string
-    - description: 'Test ID corresponding to a defined Konflux integration test'
-      name: test-id
+    - name: test-name
+      description: 'The name of the test corresponding to a defined Konflux integration test.'
       default: ''
-    - description: 'Test name corresponding to a defined Konflux integration test'
-      name: test-name
-      default: ''
-    - description: 'Openshift version for epehmeral cluster deployment'
-      name: ocp-version
+    - name: ocp-version
+      description: 'The OpenShift version to use for the ephemeral cluster deployment.'
       default: '4.15.9'
       type: string
     - name: test-event-type
+      description: 'Indicates if the test is triggered by a Pull Request or Push event.'
       default: 'none'
-      description: will indicate if a test is running in Pull Request or Push Event
     - name: region
-      default: us-west-2
-      description: 'AWS region to provision ROSA'
+      description: 'The AWS region to provision the ROSA cluster. Default is us-west-2.'
+      default: 'us-west-2'
     - name: aws-secrets
-      description: 'Secrets containing Rosa provisioning'
-      default: aws-secrets
+      description: 'The AWS secrets used for provisioning the ROSA cluster.'
+      default: 'aws-secrets'
+    - name: replicas
+      description: 'The number of replicas for the cluster nodes.'
+      default: '3'
+    - name: machine-type
+      description: 'The type of machine to use for the cluster nodes.'
+      default: 'm5.xlarge'
   tasks:
     - name: rosa-hcp-metadata
       taskRef:
@@ -74,13 +81,15 @@ spec:
           value: "$(params.ocp-version)"
         - name: region
           value: "$(params.region)"
-        - name: node_number
-          value: "3"
+        - name: replicas
+          value: "$(params.replicas)"
+        - name: machine-type
+          value: "$(params.machine-type)"
         - name: aws-secrets
           value: "$(params.aws-secrets)"
     - name: rhtap-install
       runAfter:
-        - "provision-rosa"
+        - provision-rosa
       taskRef:
         resolver: git
         params:
@@ -97,7 +106,7 @@ spec:
           value: "$(tasks.provision-rosa.results.ocp-login-command)"
     - name: sprayproxy-provision
       runAfter:
-        - "rhtap-install"
+        - rhtap-install
       taskRef:
         resolver: git
         params:
@@ -112,7 +121,7 @@ spec:
           value: "$(tasks.provision-rosa.results.ocp-login-command)"
     - name: rhtap-e2e-tests
       runAfter:
-        - "sprayproxy-provision"
+        - sprayproxy-provision
       taskRef:
         resolver: git
         params:
