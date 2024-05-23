@@ -82,7 +82,7 @@ spec:
         echo "  GIT_REVISION: $GIT_REVISION"
         echo "  PR_AUTHOR: $PR_AUTHOR"
         echo "  COMPONENT_CONTAINER_IMAGE: $COMPONENT_CONTAINER_IMAGE"
-        echo "  ORAS_STORAGE_CONTAINER: quay.io/flacatus/oras-demo:$(params.test-name)"
+        echo "  ORAS_STORAGE_CONTAINER: $(params.oras-container):$(params.test-name)"
 
         # Write each environment variable to its respective result file
         echo -n "$EVENT_TYPE" > $(results.test-event-type.path)
