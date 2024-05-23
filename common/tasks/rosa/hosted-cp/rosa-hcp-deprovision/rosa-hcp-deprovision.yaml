@@ -1,0 +1,174 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: collect-artifacts-deprovision-rosa
+spec:
+  params:
+    - name: test-name
+      type: string
+      description: The name of the test being executed.
+    - name: ocp-login-command
+      type: string
+      description: Command to log in to the OpenShift cluster.
+    - name: oras-container
+      type: string
+      description: The ORAS container registry URI to store artifacts.
+    - name: pull-request-author
+      type: string
+      description: The GitHub username of the pull request author.
+    - name: git-revision
+      type: string
+      description: The Git revision (commit SHA) of the current build.
+    - name: pull-request-number
+      type: string
+      description: The number of the GitHub pull request.
+    - name: git-repo
+      type: string
+      description: The name of the GitHub repository.
+    - name: git-org
+      type: string
+      description: The GitHub organization or user that owns the repository.
+    - name: cluster-name
+      type: string
+      description: The name of the OpenShift cluster to be deleted.
+    - name: region
+      type: string
+      description: The AWS region where the OpenShift cluster is located.
+    - name: aws-secrets
+      type: string
+      description: The secrets containing AWS credentials.
+  steps:
+    - name: collect-artifacts
+      description: Collect artifacts from the OpenShift cluster.
+      workingDir: /workspace/cluster-artifacts
+      onError: continue
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      script: |
+        #!/bin/sh
+        $(params.ocp-login-command)
+
+        curl -sSL https://raw.githubusercontent.com/konflux-qe-incubator/konflux-qe-definitions/onboard_rhtap_e2e/scripts/gather-extra.sh | bash
+    - name: inspect-upload-artifacts
+      workingDir: /workspace
+      onError: continue
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      env:
+        - name: QUAY_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: "oras-credentials"
+              key: "quay-username"
+        - name: QUAY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "oras-credentials"
+              key: "quay-password"
+      script: |
+        #!/bin/sh
+        trufflehog filesystem /workspace --only-verified --fail
+        EXIT_CODE=$?
+
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "[ERROR] Found secrets in artifacts... Container artifacts will not be uploaded to oci registry due to security reasons."
+          exit 0
+        fi
+        oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
+
+        echo '{"doc": "README.md"}' > config.json
+        oras pull "$(params.oras-container)"
+        oras push "$(params.oras-container)" --config config.json:application/vnd.acme.rocket.config.v1+json \
+          ./:application/vnd.acme.rocket.docs.layer.v1+tar
+      description: Inspect artifacts for secrets and upload them to the ORAS container registry if safe.
+    - name: pull-request-comment
+      description: Post a comment on the GitHub pull request with test results and artifact inspection instructions.
+      workingDir: /workspace
+      onError: continue
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: "github"
+              key: "token"
+      script: |
+        #!/bin/sh
+
+        export TEST_NAME="$(params.test-name)"
+        export PR_AUTHOR="$(params.pull-request-author)"
+        export GIT_REVISION="$(params.git-revision)"
+        export ORAS_CONTAINER="$(params.oras-container)"
+        export GIT_ORG="$(params.git-org)"
+        export GIT_REPO="$(params.git-repo)"
+        export PR_NUMBER="$(params.pull-request-number)"
+
+        if [ -z "$GITHUB_TOKEN" ]; then
+            echo "Error: GITHUB_TOKEN env is not set."
+            exit 1
+        fi
+
+        COMMENT=$(cat <<EOF
+        {
+          "body": "@$PR_AUTHOR: The following test finished, in case test failed say /retest to rerun all failed tests:\n\nPipelineRun name | Command\n--- | ---\n$TEST_NAME | /retest\n\nTo inspect your test artifacts make sure you have installed ORAS in your local machine. To inspect all test artifacts execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $ORAS_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
+        }
+        EOF
+        )
+
+        RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "$COMMENT" \
+            "https://api.github.com/repos/$GIT_ORG/$GIT_REPO/issues/$PR_NUMBER/comments")
+
+        if echo "$RESPONSE" | grep -q '"id"'; then
+            echo "[INFO] Comment posted successfully."
+        else
+            echo "[ERROR] Failed to post comment. Response: $RESPONSE"
+        fi
+    - name: deprovision-rosa
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      env:
+        - name: CLUSTER_NAME
+          value: "$(params.cluster-name)"
+        - name: ROSA_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.aws-secrets)"
+              key: "ROSA_TOKEN"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.aws-secrets)"
+              key: "AWS_ACCESS_KEY_ID"
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "$(params.aws-secrets)"
+              key: "AWS_SECRET_ACCESS_KEY"
+        - name: REGION
+          value: "$(params.region)"
+      script: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        config_aws_creds() {
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            aws configure set region "$REGION"
+        }
+
+        if [[ -n "$CLUSTER_NAME"  ]]; then
+            echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Started to destroy cluster [$CLUSTER_NAME]..."
+
+            printf "INFO: Logging in to your Red Hat account...\n"
+            config_aws_creds
+            rosa login --token="$ROSA_TOKEN"
+
+            # Trigger the deletion of the cluster without waiting for it to be completely deleted
+            rosa delete cluster --region "$REGION" --cluster="$CLUSTER_NAME" -y
+
+        else
+            echo "INFO: No OCP cluster needs to be destroyed."
+        fi
+
+        echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Done"

@@ -12,6 +12,8 @@ ARG YQ_VERSION=4.43.1
 
 ARG ORAS_VERSION=1.1.0
 
+RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
 RUN curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" -o /tmp/openshift-client-linux.tar.gz && \
     tar --no-same-owner -xzf /tmp/openshift-client-linux.tar.gz && \
     mv oc kubectl /usr/local/bin && \
@@ -54,6 +56,7 @@ COPY --from=builder /usr/local/bin/rosa /usr/local/bin/rosa
 COPY --from=builder /usr/local/bin/jq /usr/local/bin/jq
 COPY --from=builder /usr/local/bin/yq /usr/local/bin/yq
 COPY --from=builder /usr/local/bin/oras /usr/local/bin/oras
+COPY --from=builder /usr/local/bin/trufflehog /usr/local/bin/trufflehog
 
 RUN curl -L https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && \
     unzip awscliv2.zip && \
@@ -71,5 +74,7 @@ RUN dnf -y --setopt=tsflags=nodocs install \
     gettext \
     skopeo \
     && dnf clean all
+
+RUN curl -L https://github.com/tektoncd/cli/releases/download/v0.32.2/tkn_0.32.2_Linux_x86_64.tar.gz | tar -xz --no-same-owner -C /usr/bin/ tkn
 
 WORKDIR $HOME
