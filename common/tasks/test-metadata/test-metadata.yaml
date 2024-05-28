@@ -61,7 +61,7 @@ spec:
         - name: PR_AUTHOR
           valueFrom:
             fieldRef:
-              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/sender']
+              fieldPath: annotations.labels['pac.test.appstudio.openshift.io/sender']
       script: |
         #!/bin/sh
 
@@ -69,6 +69,11 @@ spec:
         export GIT_URL=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .source.git.url' <<< "$SNAPSHOT")
         export GIT_REVISION=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .source.git.revision' <<< "$SNAPSHOT")
         export COMPONENT_CONTAINER_IMAGE=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .containerImage' <<< "$SNAPSHOT")
+
+        # In case is comming from /retest event then is a pull_request
+        if [ "$EVENT_TYPE" = "retest-all-comment" ]; then
+          EVENT_TYPE="pull_request"
+        fi
 
         # Log the derived environment variables
         echo "Integration Test metadata:"
