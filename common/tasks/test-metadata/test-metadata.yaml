@@ -61,7 +61,7 @@ spec:
         - name: PR_AUTHOR
           valueFrom:
             fieldRef:
-              fieldPath: annotations.labels['pac.test.appstudio.openshift.io/sender']
+              fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/sender']
       script: |
         #!/bin/sh
 
