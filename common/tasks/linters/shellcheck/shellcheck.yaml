@@ -4,6 +4,10 @@ kind: Task
 metadata:
   name: shellcheck
 spec:
+  description: |
+    This task performs a ShellCheck analysis on shell scripts in a given Git repository. 
+    It clones the specified repository at the given revision, then searches for all shell 
+    scripts and runs ShellCheck to identify potential issues and warnings.
   params:
     - name: git-url
       description: The Git URL from which the test pipeline is originating. This can be from a fork or the original repository.
@@ -28,4 +32,6 @@ spec:
         #!/bin/sh
         set -e
 
-        find . -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
+        if find . -name "*.sh" | read; then
+          find . -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
+        fi
