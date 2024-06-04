@@ -28,4 +28,6 @@ spec:
         #!/bin/sh
         set -e
 
-        find . -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
+        if find . -name "*.sh" | read; then
+          find . -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
+        fi

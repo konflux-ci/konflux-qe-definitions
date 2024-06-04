@@ -18,7 +18,7 @@ spec:
       script: |
         #!/bin/sh
         set -e
-        
+
         git clone "$(params.git-url)" .
         git checkout "$(params.git-revision)"
     - name: yaml-lint
@@ -28,5 +28,28 @@ spec:
         #!/bin/sh
         set -e
 
-        yamllint .
+        cat <<EOF > linter-config.yaml
+        ---
+        yaml-files:
+          - '*.yaml'
+          - '*.yml'
+        rules:
+          braces: enable
+          brackets: enable
+          colons: enable
+          commas: enable
+          comments:
+            require-starting-space: true
+            ignore-shebangs: true
+            min-spaces-from-content: 1
+          comments-indentation: enable
+          indentation: disable
+          key-duplicates: enable
+          line-length: disable
+        EOF
 
+
+        echo "linter-config.yaml configuration file has been created."
+        cat linter-config.yaml
+
+        yamllint -c linter-config.yaml .
