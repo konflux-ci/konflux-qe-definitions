@@ -12,7 +12,24 @@ ARG YQ_VERSION=4.43.1
 
 ARG ORAS_VERSION=1.1.0
 
+ARG SHELLCHECK_VERSION=stable
+
+# renovate: datasource=github-releases depName=golangci/golangci-lint
+ARG GOLANGCI_LINT_VERSION="v1.59.0"
+
+# utilities
+RUN yum -y install xz wget
+
+# Download and install golangci-lint
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s ${GOLANGCI_LINT_VERSION} && \
+    cp bin/golangci-lint /usr/local/bin && \
+    golangci-lint --version
+
 RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+RUN wget -qO- "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION?}/shellcheck-${SHELLCHECK_VERSION?}.linux.x86_64.tar.xz" | tar -xJv && \
+    cp "shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/ && \
+    shellcheck --version
 
 RUN curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" -o /tmp/openshift-client-linux.tar.gz && \
     tar --no-same-owner -xzf /tmp/openshift-client-linux.tar.gz && \
@@ -39,6 +56,9 @@ RUN curl -LO "https://github.com/oras-project/oras/releases/download/v${ORAS_VER
     rm -rf oras_${ORAS_VERSION}_*.tar.gz oras-install/ && \
     oras version
 
+RUN curl -L https://github.com/tektoncd/cli/releases/download/v0.32.2/tkn_0.32.2_Linux_x86_64.tar.gz | tar -xz --no-same-owner -C /usr/local/bin/ tkn && \
+    tkn version
+
 # Runnable
 FROM registry.access.redhat.com/ubi9/ubi:9.3-1610@sha256:66233eebd72bb5baa25190d4f55e1dc3fff3a9b77186c1f91a0abdb274452072
 
@@ -57,6 +77,9 @@ COPY --from=builder /usr/local/bin/jq /usr/local/bin/jq
 COPY --from=builder /usr/local/bin/yq /usr/local/bin/yq
 COPY --from=builder /usr/local/bin/oras /usr/local/bin/oras
 COPY --from=builder /usr/local/bin/trufflehog /usr/local/bin/trufflehog
+COPY --from=builder /usr/local/bin/shellcheck /usr/local/bin/shellcheck
+COPY --from=builder /usr/local/bin/golangci-lint /usr/local/bin/golangci-lint
+COPY --from=builder /usr/local/bin/tkn /usr/local/bin/tkn
 
 RUN curl -L https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && \
     unzip awscliv2.zip && \
@@ -74,7 +97,5 @@ RUN dnf -y --setopt=tsflags=nodocs install \
     gettext \
     skopeo \
     && dnf clean all
-
-RUN curl -L https://github.com/tektoncd/cli/releases/download/v0.32.2/tkn_0.32.2_Linux_x86_64.tar.gz | tar -xz --no-same-owner -C /usr/bin/ tkn
 
 WORKDIR $HOME
