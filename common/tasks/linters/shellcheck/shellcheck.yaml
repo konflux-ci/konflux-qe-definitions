@@ -1,0 +1,31 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: shellcheck
+spec:
+  params:
+    - name: git-url
+      description: The Git URL from which the test pipeline is originating. This can be from a fork or the original repository.
+      type: string
+    - name: git-revision
+      description: The Git revision (commit SHA) from which the test pipeline is originating.
+      type: string
+  steps:
+    - name: clone-refs
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      workingDir: /workspace
+      script: |
+        #!/bin/sh
+        set -e
+        
+        git clone "$(params.git-url)" .
+        git checkout "$(params.git-revision)"
+    - name: shellcheck
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      workingDir: /workspace
+      script: |
+        #!/bin/sh
+        set -e
+
+        find . -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
