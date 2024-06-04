@@ -1,0 +1,57 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: yaml-lint
+spec:
+  description: |
+    This task performs YAML linting on YAML files in a given Git repository. 
+    It clones the specified repository at the given revision, then applies 
+    linting rules to YAML files to identify potential syntax and formatting issues.
+  params:
+    - name: git-url
+      description: The Git URL from which the test pipeline is originating. This can be from a fork or the original repository.
+      type: string
+    - name: git-revision
+      description: The Git revision (commit SHA) from which the test pipeline is originating.
+      type: string
+  steps:
+    - name: clone-refs
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      workingDir: /workspace
+      script: |
+        #!/bin/sh
+        set -e
+
+        git clone "$(params.git-url)" .
+        git checkout "$(params.git-revision)"
+    - name: yaml-lint
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      workingDir: /workspace
+      script: |
+        #!/bin/sh
+        set -e
+
+        cat <<EOF > linter-config.yaml
+        yaml-files:
+          - '*.yaml'
+          - '*.yml'
+        rules:
+          braces: enable
+          brackets: enable
+          colons: enable
+          commas: enable
+          comments:
+            require-starting-space: true
+            ignore-shebangs: true
+            min-spaces-from-content: 1
+          comments-indentation: enable
+          indentation: disable
+          key-duplicates: enable
+          line-length: disable
+        EOF
+
+        echo "INFO: linter-config.yaml configuration file has been created."
+        cat linter-config.yaml
+
+        yamllint -c linter-config.yaml .
