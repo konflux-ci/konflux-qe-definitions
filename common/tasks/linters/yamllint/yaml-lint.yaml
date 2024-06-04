@@ -4,6 +4,10 @@ kind: Task
 metadata:
   name: yaml-lint
 spec:
+  description: |
+    This task performs YAML linting on YAML files in a given Git repository. 
+    It clones the specified repository at the given revision, then applies 
+    linting rules to YAML files to identify potential syntax and formatting issues.
   params:
     - name: git-url
       description: The Git URL from which the test pipeline is originating. This can be from a fork or the original repository.
@@ -29,7 +33,6 @@ spec:
         set -e
 
         cat <<EOF > linter-config.yaml
-        ---
         yaml-files:
           - '*.yaml'
           - '*.yml'
@@ -48,8 +51,7 @@ spec:
           line-length: disable
         EOF
 
-
-        echo "linter-config.yaml configuration file has been created."
+        echo "INFO: linter-config.yaml configuration file has been created."
         cat linter-config.yaml
 
         yamllint -c linter-config.yaml .
