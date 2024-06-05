@@ -15,6 +15,13 @@ spec:
     - name: git-revision
       description: The Git revision (commit SHA) from which the test pipeline is originating.
       type: string
+    - name: remote-config-file
+      description: |-
+        The path to the YAML linting configuration file located in the Git repository.
+        This configuration file specifies the rules and patterns for linting YAML files.
+        It should be relative to the root of the repository.
+      type: string
+      default: ""
   steps:
     - name: clone-refs
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -32,26 +39,30 @@ spec:
         #!/bin/sh
         set -e
 
-        cat <<EOF > linter-config.yaml
-        yaml-files:
-          - '*.yaml'
-          - '*.yml'
-        rules:
-          braces: enable
-          brackets: enable
-          colons: enable
-          commas: enable
-          comments:
-            require-starting-space: true
-            ignore-shebangs: true
-            min-spaces-from-content: 1
-          comments-indentation: enable
-          indentation: disable
-          key-duplicates: enable
-          line-length: disable
+        config_file=$(params.remote-config-file)
+        if [ -z "$config_file" ]; then
+          config_file="linter-config.yaml"
+          cat <<EOF > $config_file
+          yaml-files:
+            - '*.yaml'
+            - '*.yml'
+          rules:
+            braces: enable
+            brackets: enable
+            colons: enable
+            commas: enable
+            comments:
+              require-starting-space: true
+              ignore-shebangs: true
+              min-spaces-from-content: 1
+            comments-indentation: enable
+            indentation: disable
+            key-duplicates: enable
+            line-length: disable
         EOF
+        fi
 
-        echo "INFO: linter-config.yaml configuration file has been created."
-        cat linter-config.yaml
+        echo "INFO: $config_file configuration file has been created."
+        cat $config_file
 
-        yamllint -c linter-config.yaml .
+        yamllint -c $config_file .
