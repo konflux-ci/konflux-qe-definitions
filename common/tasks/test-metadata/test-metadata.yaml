@@ -93,8 +93,8 @@ spec:
         EOF
         )
 
-        # Output JSON to a file
-        echo "$JSON"
+        echo "[INFO] Job spec:"
+        echo "$JOB_SPEC"
 
         # Log the derived environment variables
         echo "Integration Test metadata:"
@@ -120,4 +120,4 @@ spec:
         echo -n "$GIT_REVISION" > $(results.git-revision.path)
         echo -n "$PR_AUTHOR" > $(results.pull-request-author.path)
         echo -n $(params.oras-container):$(params.test-name) > $(results.oras-container.path)
-        echo -n "$JOB_SPEC" > $(results.oras-container.path)
+        echo -n "$JOB_SPEC" > $(results.job-spec.path)
