@@ -1,3 +1,4 @@
+---
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -37,8 +38,16 @@ spec:
     - name: aws-secrets
       type: string
       description: The secrets containing AWS credentials.
+    - name: pipeline-aggregate-status
+      type: string
+      description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
+      default: None
   steps:
     - name: collect-artifacts
+      when:
+        - input: "$(params.pipeline-aggregate-status)"
+          operator: in
+          values: ["Failed","None"]
       description: Collect artifacts from the OpenShift cluster.
       workingDir: /workspace/cluster-artifacts
       onError: continue
@@ -49,6 +58,10 @@ spec:
 
         curl -sSL https://raw.githubusercontent.com/konflux-qe-incubator/konflux-qe-definitions/onboard_rhtap_e2e/scripts/gather-extra.sh | bash
     - name: inspect-upload-artifacts
+      when:
+        - input: "$(params.pipeline-aggregate-status)"
+          operator: in
+          values: ["Failed","None"]
       workingDir: /workspace
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -80,6 +93,10 @@ spec:
           ./:application/vnd.acme.rocket.docs.layer.v1+tar
       description: Inspect artifacts for secrets and upload them to the ORAS container registry if safe.
     - name: pull-request-comment
+      when:
+        - input: "$(params.pipeline-aggregate-status)"
+          operator: in
+          values: ["Failed","None"]
       description: Post a comment on the GitHub pull request with test results and artifact inspection instructions.
       workingDir: /workspace
       onError: continue
