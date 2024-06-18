@@ -44,10 +44,6 @@ spec:
       default: None
   steps:
     - name: collect-artifacts
-      when:
-        - input: "$(params.pipeline-aggregate-status)"
-          operator: in
-          values: ["Failed","None"]
       description: Collect artifacts from the OpenShift cluster.
       workingDir: /workspace/cluster-artifacts
       onError: continue
@@ -56,12 +52,13 @@ spec:
         #!/bin/sh
         $(params.ocp-login-command)
 
+        if [[ $(params.pipeline-aggregate-status) == "Succeeded" ]]; then
+          echo "[INFO]: Pipeline finished successfully. Skipping artifacts collection..."
+          exit 0
+        fi
+
         curl -sSL https://raw.githubusercontent.com/konflux-qe-incubator/konflux-qe-definitions/onboard_rhtap_e2e/scripts/gather-extra.sh | bash
     - name: inspect-upload-artifacts
-      when:
-        - input: "$(params.pipeline-aggregate-status)"
-          operator: in
-          values: ["Failed","None"]
       workingDir: /workspace
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -78,6 +75,12 @@ spec:
               key: "quay-password"
       script: |
         #!/bin/sh
+
+        if [[ $(params.pipeline-aggregate-status) == "Succeeded" ]]; then
+          echo "[INFO]: Pipeline finished successfully. Skipping artifacts inspection..."
+          exit 0
+        fi
+
         trufflehog filesystem /workspace --only-verified --fail
         EXIT_CODE=$?
 
@@ -93,10 +96,6 @@ spec:
           ./:application/vnd.acme.rocket.docs.layer.v1+tar
       description: Inspect artifacts for secrets and upload them to the ORAS container registry if safe.
     - name: pull-request-comment
-      when:
-        - input: "$(params.pipeline-aggregate-status)"
-          operator: in
-          values: ["Failed","None"]
       description: Post a comment on the GitHub pull request with test results and artifact inspection instructions.
       workingDir: /workspace
       onError: continue
@@ -121,6 +120,11 @@ spec:
         if [ -z "$GITHUB_TOKEN" ]; then
             echo "Error: GITHUB_TOKEN env is not set."
             exit 1
+        fi
+
+        if [[ $(params.pipeline-aggregate-status) == "Succeeded" ]]; then
+          echo "[INFO]: Pipeline finished successfully. Skipping pull request comment..."
+          exit 0
         fi
 
         COMMENT=$(cat <<EOF
