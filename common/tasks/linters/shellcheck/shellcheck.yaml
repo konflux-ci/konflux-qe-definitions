@@ -15,6 +15,10 @@ spec:
     - name: git-revision
       description: The Git revision (commit SHA) from which the test pipeline is originating.
       type: string
+    - name: exclude-dirs
+      description: A list of files or directories to exclude from the ShellCheck analysis.
+      type: array
+      default: []
   steps:
     - name: clone-refs
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -28,10 +32,20 @@ spec:
     - name: shellcheck
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       workingDir: /workspace
+      args: ["$(params.exclude-dirs[*])"]
       script: |
         #!/bin/sh
         set -e
+        set -x
+        # using local variable excluded_dirs to store the directories to exclude
+        
+        excluded_dirs=( "$@" )
+        find_exclude=""
 
-        if find . -name "*.sh" | read; then
-          find . -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
-        fi
+        # Build the exclude pattern for find command
+        for dir in "${excluded_dirs[@]}"; do
+            find_exclude+=" -path ./$dir -prune -o"
+        done
+
+        # # Find and check all .sh files excluding specified directories
+        eval "find . ${find_exclude} -name '*.sh' -print | xargs shellcheck"
