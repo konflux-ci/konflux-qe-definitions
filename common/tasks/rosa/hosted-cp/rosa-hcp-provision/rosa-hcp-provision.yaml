@@ -26,9 +26,16 @@ spec:
     - name: aws-secrets
       type: string
       description: The secret containing the AWS credentials and other necessary details for cluster provisioning.
+  volumes:
+    - name: aws-secrets-volume
+      secret:
+        secretName: "$(params.aws-secrets)"
   steps:
     - name: provision
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      volumeMounts:
+        - name:  aws-secrets-volume
+          mountPath: /usr/local/aws-secrets
       env:
         - name: CLUSTER_NAME
           value: "$(params.cluster-name)"
@@ -38,60 +45,21 @@ spec:
           value: "$(params.ocp-version)"
         - name: MACHINE_TYPE
           value: "$(params.machine-type)"
-        - name: ROSA_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "ROSA_TOKEN"
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "AWS_ACCESS_KEY_ID"
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "AWS_SECRET_ACCESS_KEY"
-        - name: BILLING_ACCOUNT_ID
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "AWS_ACCOUNT_ID"
-        - name: AWS_OIDC_CONFIG_ID
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "AWS_OIDC_CONFIG_ID"
-        - name: OPERATOR_ROLES_PREFIX
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "OPERATOR_ROLES_PREFIX"
-        - name: SUBNET_IDS
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "SUBNET_IDS"
-        - name: INSTALL_ROLE_ARN
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "INSTALL_ROLE_ARN"
-        - name: SUPPORT_ROLE_ARN
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "SUPPORT_ROLE_ARN"
-        - name: WORKER_ROLE_ARN
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "WORKER_ROLE_ARN"
       script: |
         set -o errexit
         set -o nounset
         set -o pipefail
+
+        ROSA_TOKEN=$(cat /usr/local/aws-secrets/ROSA_TOKEN)
+        AWS_ACCESS_KEY_ID=$(cat /usr/local/aws-secrets/AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY=$(cat /usr/local/aws-secrets/AWS_SECRET_ACCESS_KEY)
+        BILLING_ACCOUNT_ID=$(cat /usr/local/aws-secrets/AWS_ACCOUNT_ID)
+        AWS_OIDC_CONFIG_ID=$(cat /usr/local/aws-secrets/AWS_OIDC_CONFIG_ID)
+        OPERATOR_ROLES_PREFIX=$(cat /usr/local/aws-secrets/OPERATOR_ROLES_PREFIX)
+        SUBNET_IDS=$(cat /usr/local/aws-secrets/SUBNET_IDS)
+        INSTALL_ROLE_ARN=$(cat /usr/local/aws-secrets/INSTALL_ROLE_ARN)
+        SUPPORT_ROLE_ARN=$(cat /usr/local/aws-secrets/SUPPORT_ROLE_ARN)
+        WORKER_ROLE_ARN=$(cat /usr/local/aws-secrets/WORKER_ROLE_ARN)
 
         config_aws_creds() {
             printf "INFO: Configure AWS Credentials...\n" 

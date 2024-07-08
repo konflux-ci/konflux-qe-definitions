@@ -42,6 +42,16 @@ spec:
       type: string
       description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
       default: None
+  volumes:
+    - name: aws-secrets-volume
+      secret:
+        secretName: "$(params.aws-secrets)"
+    - name: oras-credentials-volume
+      secret:
+        secretName: oras-credentials
+    - name: github-volume
+      secret:
+        secretName: github
   steps:
     - name: collect-artifacts
       workingDir: /workspace/cluster-artifacts
@@ -61,17 +71,9 @@ spec:
       workingDir: /workspace
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
-      env:
-        - name: QUAY_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: "oras-credentials"
-              key: "quay-username"
-        - name: QUAY_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "oras-credentials"
-              key: "quay-password"
+      volumeMounts:
+        - name:  oras-credentials-volume
+          mountPath: /usr/local/oras-credentials
       script: |
         #!/bin/sh
 
@@ -87,6 +89,9 @@ spec:
           echo "[ERROR] Found secrets in artifacts... Container artifacts will not be uploaded to oci registry due to security reasons."
           exit 0
         fi
+
+        QUAY_USERNAME=$(cat /usr/local/oras-credentials/quay-username)
+        QUAY_PASSWORD=$(cat /usr/local/oras-credentials/quay-password)
         oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
 
         echo '{"doc": "README.md"}' > config.json
@@ -97,12 +102,9 @@ spec:
       workingDir: /workspace
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
-      env:
-        - name: GITHUB_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: "github"
-              key: "token"
+      volumeMounts:
+        - name:  github-volume
+          mountPath: /usr/local/github
       script: |
         #!/bin/sh
 
@@ -114,6 +116,7 @@ spec:
         export GIT_REPO="$(params.git-repo)"
         export PR_NUMBER="$(params.pull-request-number)"
 
+        GITHUB_TOKEN=$(cat /usr/local/github/token)
         if [ -z "$GITHUB_TOKEN" ]; then
             echo "Error: GITHUB_TOKEN env is not set."
             exit 1
@@ -144,30 +147,19 @@ spec:
         fi
     - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
-      env:
-        - name: CLUSTER_NAME
-          value: "$(params.cluster-name)"
-        - name: ROSA_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "ROSA_TOKEN"
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "AWS_ACCESS_KEY_ID"
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "$(params.aws-secrets)"
-              key: "AWS_SECRET_ACCESS_KEY"
-        - name: REGION
-          value: "$(params.region)"
+      volumeMounts:
+        - name:  aws-secrets-volume
+          mountPath: /usr/local/aws-secrets
       script: |
         set -o errexit
         set -o nounset
         set -o pipefail
+
+        CLUSTER_NAME=$(params.cluster-name)
+        REGION=$(params.region)
+        AWS_ACCESS_KEY_ID=$(cat /usr/local/aws-secrets/AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY=$(cat /usr/local/aws-secrets/AWS_SECRET_ACCESS_KEY)
+        ROSA_TOKEN=$(cat /usr/local/aws-secrets/ROSA_TOKEN)
 
         config_aws_creds() {
             aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
