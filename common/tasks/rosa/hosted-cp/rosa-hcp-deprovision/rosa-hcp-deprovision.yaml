@@ -44,7 +44,6 @@ spec:
       default: None
   steps:
     - name: collect-artifacts
-      description: Collect artifacts from the OpenShift cluster.
       workingDir: /workspace/cluster-artifacts
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -94,9 +93,7 @@ spec:
         oras pull "$(params.oras-container)"
         oras push "$(params.oras-container)" --config config.json:application/vnd.acme.rocket.config.v1+json \
           ./:application/vnd.acme.rocket.docs.layer.v1+tar
-      description: Inspect artifacts for secrets and upload them to the ORAS container registry if safe.
     - name: pull-request-comment
-      description: Post a comment on the GitHub pull request with test results and artifact inspection instructions.
       workingDir: /workspace
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
