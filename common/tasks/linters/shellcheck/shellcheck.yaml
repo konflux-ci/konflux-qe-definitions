@@ -47,5 +47,13 @@ spec:
             find_exclude+=" -path ./$dir -prune -o"
         done
 
-        # # Find and check all .sh files excluding specified directories
-        eval "find . ${find_exclude} -name '*.sh' -print | xargs shellcheck"
+        # Find all .sh files excluding specified directories
+        sh_files=$(eval "find . ${find_exclude} -name '*.sh' -print")
+
+        # Check if any .sh files were found
+        if [ -n "$sh_files" ]; then
+            # Run shellcheck on the found .sh files
+            echo "$sh_files" | xargs shellcheck
+        else
+            echo "[INFO] No .sh files found to check."
+        fi
