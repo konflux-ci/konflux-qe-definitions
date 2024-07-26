@@ -1,0 +1,96 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: quality-dashboard-metrics
+spec:
+  params:
+    - name: test-name
+      type: string
+      description: The name of the test being executed.
+    - name: oras-container
+      type: string
+      description: The ORAS container used to store all test artifacts. From this container will generate one with test tag.
+    - name: quality-dashboard-api
+      type: string
+      default: ""
+    - name: pipeline-aggregate-status
+      type: string
+      description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
+      default: None
+    - name: test-event-type
+      description: Indicates if the job is triggered by a Pull Request or a Push event.
+  steps:
+    - name: quality-dashboard-metadata
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      workingDir: /workspace
+      env:
+        - name: GIT_ORGANIZATION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/url-org']
+        - name: GIT_REPOSITORY
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/url-repository']
+        - name: JOB_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['test.appstudio.openshift.io/scenario']
+      script: |
+        #!/bin/bash
+
+        # In case is coming from /retest event then it's a pull_request
+        # if event type is not push and pull_request_number is not empty then is a pull_request
+        if [ "$EVENT_TYPE" != "push" ] && [ -n "$PULL_REQUEST_NUMBER" ]; then
+          EVENT_TYPE="pull_request"
+        fi
+        
+        if [ "$(params.pipeline-aggregate-status)" == "Succeeded" ] || [ "$(params.pipeline-aggregate-status)" == "Completed" ]; then
+          STATUS="success"
+        fi
+        if [ "$(params.pipeline-aggregate-status)" == "Failed" ]; then
+          STATUS="failure"
+        fi
+        if [ "$(params.pipeline-aggregate-status)" == "None" ]; then
+          STATUS="aborted"
+        fi
+        CREATED_AT=$(eval date -u +"%Y-%m-%dT%H:%M:%SZ")
+        METADATA_JSON=$(cat <<EOF
+        {
+          "state": "$STATUS",
+          "job_id": "$(params.test-name)",
+          "created_at": "$CREATED_AT",
+          "job_type": "$(params.test-event-type)",
+          "job_name": "$JOB_NAME",
+          "job_url": "empty",
+          "external_impact": false,
+          "repository_name": "$GIT_REPOSITORY",
+          "git_organization": "$GIT_ORGANIZATION"
+        }
+        EOF
+        )
+        
+        # Write the metadata JSON to a file
+        echo "$METADATA_JSON" > metadata.json
+
+        # Print the content of the metadata.json file (for debugging purposes)
+        echo "[INFO] metadata.json content:"
+        cat metadata.json
+        
+        oras pull "$(params.oras-container)" -o ./oras-output
+        
+        # Try to get the first file starting with "qd-report"
+        QD_REPORT_FILENAME=$(find ./oras-output -name "qd-report*" | head -1)
+
+        # If no "qd-report" file is found, get the first file starting with "e2e-report"
+        if [ -z "$QD_REPORT_FILENAME" ]; then
+            QD_REPORT_FILENAME=$(find ./oras-output -name "e2e-report*" | head -1)
+        fi
+
+        echo "[INFO] Report filename: $QD_REPORT_FILENAME"
+        
+        curl -F "metadata=@./metadata.json" \
+          -F "xunit=@$QD_REPORT_FILENAME" \
+          -X POST \
+          "$(params.quality-dashboard-api)/api/quality/konflux/metadata/post"
