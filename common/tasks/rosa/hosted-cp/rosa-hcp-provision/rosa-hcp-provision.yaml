@@ -132,7 +132,6 @@ spec:
                 --subnet-ids="$SUBNET_IDS" \
                 --billing-account "$BILLING_ACCOUNT_ID" \
                 --replicas $(params.replicas) \
-                --tags konflux-ci:true,creation-date:$(date -u +"%Y-%m-%d"),cluster-type:rosa-hcp \
                 --hosted-cp -y
 
             printf "INFO: Track the progress of the cluster creation...\n" 
