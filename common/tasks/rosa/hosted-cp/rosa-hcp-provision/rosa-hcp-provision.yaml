@@ -10,9 +10,6 @@ spec:
     - name: ocp-version
       type: string
       description: The version of the OpenShift Container Platform (OCP) to deploy.
-    - name: region
-      type: string
-      description: The AWS region where the OpenShift cluster will be created.
     - name: cluster-name
       type: string
       description: The name of the OpenShift cluster to be created.
@@ -23,24 +20,30 @@ spec:
       type: string
       description: The number of worker nodes to provision in the cluster.
       default: '3'
-    - name: aws-secrets
+    - name: aws-credential-secret
       type: string
-      description: The secret containing the AWS credentials and other necessary details for cluster provisioning.
+      description: The name of the secret that contains the AWS credentials.
+    - name: hcp-config-secret
+      type: string
+      description: The name of the secret that contains configuration data for HCP cluster creation.
   volumes:
-    - name: aws-secrets-volume
+    - name: aws-credential-volume
       secret:
-        secretName: "$(params.aws-secrets)"
+        secretName: "$(params.aws-credential-secret)"
+    - name: hcp-config-volume
+      secret:
+        secretName: "$(params.hcp-config-secret)"
   steps:
     - name: provision
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  aws-secrets-volume
-          mountPath: /usr/local/aws-secrets
+        - name:  aws-credential-volume
+          mountPath: /usr/local/aws-credential
+        - name:  hcp-config-volume
+          mountPath: /usr/local/hcp-config
       env:
         - name: CLUSTER_NAME
           value: "$(params.cluster-name)"
-        - name: REGION
-          value: "$(params.region)"
         - name: OCP_VERSION
           value: "$(params.ocp-version)"
         - name: MACHINE_TYPE
@@ -50,16 +53,17 @@ spec:
         set -o nounset
         set -o pipefail
 
-        ROSA_TOKEN=$(cat /usr/local/aws-secrets/ROSA_TOKEN)
-        AWS_ACCESS_KEY_ID=$(cat /usr/local/aws-secrets/AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY=$(cat /usr/local/aws-secrets/AWS_SECRET_ACCESS_KEY)
-        BILLING_ACCOUNT_ID=$(cat /usr/local/aws-secrets/AWS_ACCOUNT_ID)
-        AWS_OIDC_CONFIG_ID=$(cat /usr/local/aws-secrets/AWS_OIDC_CONFIG_ID)
-        OPERATOR_ROLES_PREFIX=$(cat /usr/local/aws-secrets/OPERATOR_ROLES_PREFIX)
-        SUBNET_IDS=$(cat /usr/local/aws-secrets/SUBNET_IDS)
-        INSTALL_ROLE_ARN=$(cat /usr/local/aws-secrets/INSTALL_ROLE_ARN)
-        SUPPORT_ROLE_ARN=$(cat /usr/local/aws-secrets/SUPPORT_ROLE_ARN)
-        WORKER_ROLE_ARN=$(cat /usr/local/aws-secrets/WORKER_ROLE_ARN)
+        ROSA_TOKEN=$(cat /usr/local/hcp-config/ROSA_TOKEN)
+        AWS_ACCESS_KEY_ID=$(cat /usr/local/aws-credential/AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY=$(cat /usr/local/aws-credential/AWS_SECRET_ACCESS_KEY)
+        BILLING_ACCOUNT_ID=$(cat /usr/local/aws-credential/AWS_ACCOUNT_ID)
+        AWS_OIDC_CONFIG_ID=$(cat /usr/local/hcp-config/AWS_OIDC_CONFIG_ID)
+        OPERATOR_ROLES_PREFIX=$(cat /usr/local/hcp-config/OPERATOR_ROLES_PREFIX)
+        SUBNET_IDS=$(cat /usr/local/hcp-config/SUBNET_IDS)
+        INSTALL_ROLE_ARN=$(cat /usr/local/hcp-config/INSTALL_ROLE_ARN)
+        SUPPORT_ROLE_ARN=$(cat /usr/local/hcp-config/SUPPORT_ROLE_ARN)
+        WORKER_ROLE_ARN=$(cat /usr/local/hcp-config/WORKER_ROLE_ARN)
+        REGION=$(cat /usr/local/hcp-config/REGION)
 
         config_aws_creds() {
             printf "INFO: Configure AWS Credentials...\n" 
@@ -132,6 +136,7 @@ spec:
                 --subnet-ids="$SUBNET_IDS" \
                 --billing-account "$BILLING_ACCOUNT_ID" \
                 --replicas $(params.replicas) \
+                --tags konflux-ci:true,creation-date:$(date -u +"%Y-%m-%d"),cluster-type:rosa-hcp \
                 --hosted-cp -y
 
             printf "INFO: Track the progress of the cluster creation...\n" 
