@@ -6,4 +6,4 @@
 
 - [Onboarding Guide](./onboarding/Prerequisites_Guide.md)
   - [Prerequisites Guide](./onboarding/Prerequisites_Guide.md)
-  - [Add Integration Tests](./onboarding/Prerequisites_Guide.md)
+  - [Add Integration Tests](../README.md)
