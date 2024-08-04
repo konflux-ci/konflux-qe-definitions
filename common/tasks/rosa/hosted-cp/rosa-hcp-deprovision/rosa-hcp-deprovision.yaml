@@ -32,20 +32,23 @@ spec:
     - name: cluster-name
       type: string
       description: The name of the OpenShift cluster to be deleted.
-    - name: region
+    - name: aws-credential-secret
       type: string
-      description: The AWS region where the OpenShift cluster is located.
-    - name: aws-secrets
+      description: The name of secret used for containing AWS credentials.
+    - name: hcp-config-secret
       type: string
-      description: The secrets containing AWS credentials.
+      description: The name of secret used for containing configuration data for HCP cluster creation.
     - name: pipeline-aggregate-status
       type: string
       description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
       default: None
   volumes:
-    - name: aws-secrets-volume
+    - name: aws-credential-volume
       secret:
-        secretName: "$(params.aws-secrets)"
+        secretName: "$(params.aws-credential-secret)"
+    - name: hcp-config-volume
+      secret:
+        secretName: "$(params.hcp-config-secret)"
     - name: oras-credentials-volume
       secret:
         secretName: oras-credentials
@@ -148,19 +151,21 @@ spec:
     - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  aws-secrets-volume
-          mountPath: /usr/local/aws-secrets
+        - name:  aws-credential-volume
+          mountPath: /usr/local/aws-credential
+        - name:  hcp-config-volume
+          mountPath: /usr/local/hcp-config
       script: |
         set -o errexit
         set -o nounset
         set -o pipefail
 
         CLUSTER_NAME=$(params.cluster-name)
-        REGION=$(params.region)
-        AWS_ACCESS_KEY_ID=$(cat /usr/local/aws-secrets/AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY=$(cat /usr/local/aws-secrets/AWS_SECRET_ACCESS_KEY)
-        ROSA_TOKEN=$(cat /usr/local/aws-secrets/ROSA_TOKEN)
-
+        REGION=$(cat /usr/local/hcp-config/REGION)
+        AWS_ACCESS_KEY_ID=$(cat /usr/local/aws-credential/AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY=$(cat /usr/local/aws-credential/AWS_SECRET_ACCESS_KEY)
+        ROSA_TOKEN=$(cat /usr/local/hcp-config/ROSA_TOKEN)
+        
         config_aws_creds() {
             aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
