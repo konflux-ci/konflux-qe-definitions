@@ -20,27 +20,22 @@ spec:
       type: string
       description: The number of worker nodes to provision in the cluster.
       default: '3'
-    - name: aws-credential-secret
+    - name: konflux-test-infra-secret
       type: string
-      description: The name of the secret that contains the AWS credentials.
-    - name: hcp-config-secret
+      description: The name of secret where testing infrastructures credentials are stored.
+    - name: cloud-credential-key
       type: string
-      description: The name of the secret that contains configuration data for HCP cluster creation.
+      description: The key secret where all AWS ROSA configurations are stored.
   volumes:
-    - name: aws-credential-volume
+    - name: konflux-test-infra-volume
       secret:
-        secretName: "$(params.aws-credential-secret)"
-    - name: hcp-config-volume
-      secret:
-        secretName: "$(params.hcp-config-secret)"
+        secretName: "$(params.konflux-test-infra-secret)"
   steps:
     - name: provision
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  aws-credential-volume
-          mountPath: /usr/local/aws-credential
-        - name:  hcp-config-volume
-          mountPath: /usr/local/hcp-config
+        - name:  konflux-test-infra-volume
+          mountPath: /usr/local/konflux-test-infra
       env:
         - name: CLUSTER_NAME
           value: "$(params.cluster-name)"
@@ -53,17 +48,20 @@ spec:
         set -o nounset
         set -o pipefail
 
-        ROSA_TOKEN=$(cat /usr/local/hcp-config/ROSA_TOKEN)
-        AWS_ACCESS_KEY_ID=$(cat /usr/local/aws-credential/AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY=$(cat /usr/local/aws-credential/AWS_SECRET_ACCESS_KEY)
-        BILLING_ACCOUNT_ID=$(cat /usr/local/aws-credential/AWS_ACCOUNT_ID)
-        AWS_OIDC_CONFIG_ID=$(cat /usr/local/hcp-config/AWS_OIDC_CONFIG_ID)
-        OPERATOR_ROLES_PREFIX=$(cat /usr/local/hcp-config/OPERATOR_ROLES_PREFIX)
-        SUBNET_IDS=$(cat /usr/local/hcp-config/SUBNET_IDS)
-        INSTALL_ROLE_ARN=$(cat /usr/local/hcp-config/INSTALL_ROLE_ARN)
-        SUPPORT_ROLE_ARN=$(cat /usr/local/hcp-config/SUPPORT_ROLE_ARN)
-        WORKER_ROLE_ARN=$(cat /usr/local/hcp-config/WORKER_ROLE_ARN)
-        REGION=$(cat /usr/local/hcp-config/REGION)
+        export ROSA_TOKEN AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY BILLING_ACCOUNT_ID AWS_OIDC_CONFIG_ID OPERATOR_ROLES_PREFIX \
+              SUBNET_IDS INSTALL_ROLE_ARN SUPPORT_ROLE_ARN WORKER_ROLE_ARN REGION
+
+        ROSA_TOKEN=$(jq -r '.aws.rosa-hcp["rosa-token"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        AWS_ACCESS_KEY_ID=$(jq -r '.aws["access-key-id"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        AWS_SECRET_ACCESS_KEY=$(jq -r '.aws["access-key-secret"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        BILLING_ACCOUNT_ID=$(jq -r '.aws["aws-account-id"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        AWS_OIDC_CONFIG_ID=$(jq -r '.aws.rosa-hcp["aws-oidc-config-id"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        OPERATOR_ROLES_PREFIX=$(jq -r '.aws.rosa-hcp["operator-roles-prefix"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        SUBNET_IDS=$(jq -r '.aws.rosa-hcp["subnets-ids"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        INSTALL_ROLE_ARN=$(jq -r '.aws.rosa-hcp["install-role-arn"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        SUPPORT_ROLE_ARN=$(jq -r '.aws.rosa-hcp["support-role-arn"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        WORKER_ROLE_ARN=$(jq -r '.aws.rosa-hcp["worker-role-arn"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        REGION=$(jq -r '.aws["region"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
 
         config_aws_creds() {
             printf "INFO: Configure AWS Credentials...\n" 
