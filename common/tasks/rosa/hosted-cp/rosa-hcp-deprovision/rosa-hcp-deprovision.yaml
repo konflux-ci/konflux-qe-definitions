@@ -34,10 +34,10 @@ spec:
       description: The name of the OpenShift cluster to be deleted.
     - name: konflux-test-infra-secret
       type: string
-      description: The name of secret where cloud infrastructures credentials are stored.
+      description: The name of secret where testing infrastructures credentials are stored.
     - name: cloud-credential-key
       type: string
-      description: The key secret where all AWS ROSA configurations are stored.
+      description: The key secret from konflux-test-infra-secret where all AWS ROSA configurations are stored.
     - name: pipeline-aggregate-status
       type: string
       description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
@@ -116,7 +116,7 @@ spec:
         export GIT_REPO="$(params.git-repo)"
         export PR_NUMBER="$(params.pull-request-number)"
 
-        GITHUB_TOKEN=$(jq -r '.github-bot-commenter-token' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        GITHUB_TOKEN=$(cat /usr/local/konflux-test-infra/github-bot-commenter-token)
         if [ -z "$GITHUB_TOKEN" ]; then
             echo "Error: GITHUB_TOKEN env is not set."
             exit 1
@@ -161,7 +161,7 @@ spec:
         REGION=$(jq -r '.aws["region"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
         AWS_ACCESS_KEY_ID=$(jq -r '.aws["access-key-id"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
         AWS_SECRET_ACCESS_KEY=$(jq -r '.aws["access-key-secret"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
-        ROSA_TOKEN=$(jq -r '.aws.rosa-hcp["rosa-token"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        ROSA_TOKEN=$(jq -r '.aws["rosa-hcp"]["rosa-token"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
 
         config_aws_creds() {
             aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
