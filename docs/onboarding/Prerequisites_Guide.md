@@ -1,10 +1,10 @@
-## Table of Contents<!-- omit from toc -->
+## Table of Contents
 
 - [Overview](#overview)
 - [Requirements](#requirements)
-    - [AWS Credentials for ROSA](#aws-credentials-for-rosa)
-    - [Pull Request Commenter GitHub Token](#pull-request-commenter-github-token)
-- [Adding an Integration Test](#adding-an-integration-test)
+  - [Setting Up Infrastructure Credentials](#setting-up-infrastructure-credentials)
+  - [Configuring E2E Credentials](#configuring-e2e-credentials)
+  - [Adding External Secrets](#adding-external-secrets)
 - [FAQs](#faqs)
 - [Troubleshooting](#troubleshooting)
 - [Contact Us](#contact-us)
@@ -19,59 +19,91 @@ This document is designed to assist QE teams in preparing their testing reposito
 
 To run integration tests in Konflux, there are several requirements:
 
-1. You have created an **application** in Konflux.
-2. **AWS Credentials** for ephemeral ROSA clusters.
-3. **GitHub Token** for pull-request commenter. Konflux QE creates a utility in ROSA Deprovision tasks to comment on pull requests after the Integration Test finishes.
+1. **Application in Konflux**: Ensure you have created an application in Konflux.
+2. [Setup external secrets](#adding-external-secrets) to sync all necessary secrets to run your integration tests. To run Konflux E2E, there are 2 mandatory secrets that need to be synced from Vault:
+    1. **konflux-e2e-secrets**: Required to install and launch the Konflux E2E Framework.
+    2. **konflux-test-infra**: Required to launch Rosa installation.
 
-> **Note:** Konflux e2e secrets are stored all in vault.devshift. To access the secrets you need to open a Pull Request as the [following](https://github.com/redhat-appstudio/infra-deployments/pull/4255) in infra-deployments.
+### Setting Up Infrastructure Credentials
 
-### AWS Credentials for ROSA
+**Infrastructure credentials** are stored in the vault with the name `konflux-test-infra`. If your team is not part of Konflux, create your own **Infrastructure credentials** in the vault using this structure as a reference:
 
-To run ROSA (Red Hat OpenShift Service on AWS) clusters, you need valid AWS credentials. These credentials must have the necessary permissions to create and manage ephemeral ROSA clusters.
+**github-bot-commenter-token**: "ey...."
 
+**cloud-credential-{*aws-region*}**:
+```json
+{
+  "aws": {
+    "region": "us-east-2",
+    "access-key-secret": "none",
+    "access-key-id": "none",
+    "aws-account-id": "none",
+    "rosa-hcp": {
+      "rosa-token": "ey....",
+      "aws-oidc-config-id": "none",
+      "operator-roles-prefix": "none",
+      "subnets-ids": "none",
+      "install-role-arn": "none",
+      "support-role-arn": "none",
+      "worker-role-arn": "none"
+    }
+  }
+}
+```
 
-### Pull Request Commenter GitHub Token
+### Configuring E2E Credentials
 
-A GitHub Token is required for Konflux to comment on pull requests. This is used in the ROSA Deprovision tasks to notify the status of integration tests.
+**E2E credentials** are stored in the vault with the name `konflux-e2e-secrets`. If your team is not part of Konflux, create your own **E2E credentials** in the vault using your own structure.
 
-**Steps to create a GitHub Token:**
+### Adding External Secrets
 
-1. Go to your GitHub account settings.
-2. Navigate to **Developer settings** > **Personal access tokens**.
-3. Click on **Generate new token**.
-4. Select the scopes required for commenting on pull requests, such as `repo` and `public_repo`.
-5. Generate and securely store the token.
+1. **Modify YAML**:
+    - Adjust the following example YAML configuration to suit your tenant namespace:
+    ```yaml
+    ---
+    apiVersion: external-secrets.io/v1beta1
+    kind: ExternalSecret
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+        argocd.argoproj.io/sync-wave: '-1'
+      name: <secret-name>
+      namespace: <tenant-namespace>
+    spec:
+      dataFrom:
+        - extract:
+            conversionStrategy: Default
+            decodingStrategy: None
+            key: production/qe/<secret-name> # in case of Konflux components
+      refreshInterval: 10m
+      secretStoreRef:
+        kind: ClusterSecretStore
+        name: appsre-stonesoup-vault
+      target:
+        creationPolicy: Owner
+        deletionPolicy: Delete
+        name: <secret-name>
+    ```
 
-> **Note:** Keep this token secure and do not expose it in your repositories.
-
-## Adding an Integration Test
-
-1. Open your application in Konflux and go to the **Integration tests** tab.
-2. Select **Add integration test**.
-3. In the **Integration test name** field, enter a name of your choosing.
-4. In the **GitHub URL** field, enter the URL of the GitHub repository that contains the test pipeline you want to use.
-5. Optional: If you want to use a branch, commit, or version other than the default, specify the branch name, commit SHA, or tag in the **Revisions** field.
-6. In the **Path in repository** field, enter the path to the .yaml file that defines the test you want to use.
-7. Optional: To allow the integration tests to fail without impacting the release process of your application, you can choose to select **Mark as optional for release**.
-8. Select **Add integration test**.
-9. To start building a new component, either open a new pull request (PR) that targets the tracked branch of the component in the GitHub repository, or comment '/retest' on an existing PR.
+2. **Apply Configuration**:
+    - Apply the YAML configuration to create the external secrets in your tenant namespace:
+    ```sh
+    kubectl apply -f <your-external-secret-config>.yaml
+    ```
 
 ## FAQs
 
-**Q: What is Konflux CI?**
-A: WIP.
-
-**Q: How do I secure my AWS credentials and GitHub tokens?**
-A: Store them in a secure environment variable manager or secrets manager, and ensure they are not exposed in your codebase.
+**Q:** How often do the secrets refresh?
+**A:** Secrets are refreshed every 10 minutes as specified by the `refreshInterval` in the YAML configuration.
 
 ## Troubleshooting
 
 - **Issue:** Integration test fails to start.
-  - **Solution:** Verify that your AWS credentials and GitHub tokens are correctly configured and have the necessary permissions.
+  - **Solution:** Verify that your AWS credentials and GitHub tokens are correctly configured and have the necessary permissions. Double-check the secret names and values in your vault.
 
 - **Issue:** Unable to add a GitHub repository URL.
-  - **Solution:** Ensure the URL is correct and accessible, and that you have the required permissions to access the repository.
+  - **Solution:** Ensure the URL is correct and accessible, and that you have the required permissions to access the repository. Check if there are any network restrictions or firewall rules blocking the access.
 
 ## Contact Us
 
-For further assistance, feel free to reach out:
+For further assistance, feel free to reach out via the Slack channel [#forum-konflux-qe](https://slack.com)..

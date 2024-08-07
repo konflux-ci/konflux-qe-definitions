@@ -37,7 +37,7 @@ spec:
       description: The name of secret used for containing AWS credentials.
     - name: hcp-config-secret
       type: string
-      description: The name of secret used for containing configuration data for HCP cluster creation.
+      description: The name of secret used for containing configuration data for ROSA HCP clusters.
     - name: pipeline-aggregate-status
       type: string
       description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
@@ -101,53 +101,6 @@ spec:
         oras pull "$(params.oras-container)"
         oras push "$(params.oras-container)" --config config.json:application/vnd.acme.rocket.config.v1+json \
           ./:application/vnd.acme.rocket.docs.layer.v1+tar
-    - name: pull-request-comment
-      workingDir: /workspace
-      onError: continue
-      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
-      volumeMounts:
-        - name:  github-volume
-          mountPath: /usr/local/github
-      script: |
-        #!/bin/sh
-
-        export TEST_NAME="$(params.test-name)"
-        export PR_AUTHOR="$(params.pull-request-author)"
-        export GIT_REVISION="$(params.git-revision)"
-        export ORAS_CONTAINER="$(params.oras-container)"
-        export GIT_ORG="$(params.git-org)"
-        export GIT_REPO="$(params.git-repo)"
-        export PR_NUMBER="$(params.pull-request-number)"
-
-        GITHUB_TOKEN=$(cat /usr/local/github/token)
-        if [ -z "$GITHUB_TOKEN" ]; then
-            echo "Error: GITHUB_TOKEN env is not set."
-            exit 1
-        fi
-
-        if [[ $(params.pipeline-aggregate-status) == "Succeeded" ]]; then
-          echo "[INFO]: Pipeline finished successfully. Skipping pull request comment..."
-          exit 0
-        fi
-
-        COMMENT=$(cat <<EOF
-        {
-          "body": "@$PR_AUTHOR: The following test finished, in case test failed say /retest to rerun all failed tests:\n\nPipelineRun name | Command\n--- | ---\n$TEST_NAME | /retest\n\nTo inspect your test artifacts make sure you have installed ORAS in your local machine. To inspect all test artifacts execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $ORAS_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
-        }
-        EOF
-        )
-
-        RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Content-Type: application/json" \
-            -X POST \
-            -d "$COMMENT" \
-            "https://api.github.com/repos/$GIT_ORG/$GIT_REPO/issues/$PR_NUMBER/comments")
-
-        if echo "$RESPONSE" | grep -q '"id"'; then
-            echo "[INFO] Comment posted successfully."
-        else
-            echo "[ERROR] Failed to post comment. Response: $RESPONSE"
-        fi
     - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
