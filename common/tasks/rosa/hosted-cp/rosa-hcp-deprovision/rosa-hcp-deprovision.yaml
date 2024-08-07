@@ -37,7 +37,7 @@ spec:
       description: The name of secret used for containing AWS credentials.
     - name: hcp-config-secret
       type: string
-      description: The name of secret used for containing configuration data for ROSA HCP clusters.
+      description: The name of secret used for containing configuration data for HCP cluster creation.
     - name: pipeline-aggregate-status
       type: string
       description: Contains status of a pipeline(Succeeded, Failed, Completed, None)

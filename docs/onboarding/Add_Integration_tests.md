@@ -34,7 +34,7 @@ After generating the Pipeline you can modify the task acordingly to your needs.
 
 ### Skip artifacts load to OCI registry
 
-By default tasks like `deprovision-rosa-collect-artifacts` or `pull-request-status-message` pass as param *pipeline-aggregate-status* set to "$(tasks.status)". This param will be take by the tasks and will skip to collect logs or comment the pull request with integration test status in case of success.
+By default tasks like `deprovision-rosa-collect-artifacts` or `pull-request-status-message` pass as param *pipeline-aggregate-status* set to `"$(tasks.status)"`. This param will be take by the tasks and will skip to collect logs or don't comment the pull request with integration test status in case of success.
 
 Example:
 ```yaml
