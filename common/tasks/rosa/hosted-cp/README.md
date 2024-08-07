@@ -54,27 +54,12 @@ This [task](./rosa-hcp-deprovision/rosa-hcp-deprovision.yaml) deprovisions an ex
 - **git-repo**: The name of the GitHub repository.
 - **git-org**: The GitHub organization or user that owns the repository.
 - **cluster-name**: The name of the OpenShift cluster to be deleted.
-- **aws-credential-secret**: The secret containing the AWS credentials and AWS account ID for cluster provisioning.
-- **hcp-config-secret**: The secret containing the AWS resources for cluster provisioning. You can refer to this [link](https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html#rosa-hcp-prereqs) to create AWS resources
+- **konflux-test-infra-secret**: The name of secret where testing infrastructures credentials are stored..
+- **cloud-credential-key**: The key secret from konflux-test-infra-secret where all AWS ROSA configurations are stored. You can refer to this [link](https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html#rosa-hcp-prereqs) to create AWS resources
 
-#### AWS Credential Secret
+#### Konflux infra Secret
 
-You need to create a secret including the following data in Konflux, and pass its name to tasks as parameter `aws-credential-secret` 
-
-```
-apiVersion: v1
-kind: Secret
-metadata:
-  name: <REPLACE_ME>
-data:
-  AWS_ACCESS_KEY_ID: <REPLACE_ME>
-  AWS_ACCOUNT_ID: <REPLACE_ME>
-  AWS_SECRET_ACCESS_KEY: <REPLACE_ME>
-type: Opaque
-```
-
-#### ROSA with HCP  Config Secret
-You need to create a secret including the following data in Konflux, and pass its name to tasks as parameter `hcp-config-secret` 
+You need to create a secret including the following data in Konflux, and pass its name to tasks as parameter `konflux-test-infra-secret` 
 
 ```
 apiVersion: v1
@@ -82,14 +67,8 @@ kind: Secret
 metadata:
   name: <REPLACE_ME>
 data:
-  AWS_OIDC_CONFIG_ID: <REPLACE_ME>
-  INSTALL_ROLE_ARN: <REPLACE_ME>
-  OPERATOR_ROLES_PREFIX: <REPLACE_ME>
-  REGION: <REPLACE_ME>
-  ROSA_TOKEN: <REPLACE_ME>
-  SUBNET_IDS: <REPLACE_ME>
-  SUPPORT_ROLE_ARN: <REPLACE_ME>
-  WORKER_ROLE_ARN: <REPLACE_ME>
+  cloud-credentials-<region>: <REPLACE_ME>
+  github-bot-commenter-token: <REPLACE_ME>
 type: Opaque
 ```
 
