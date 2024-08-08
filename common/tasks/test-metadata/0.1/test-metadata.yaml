@@ -25,6 +25,10 @@ spec:
       description: The GitHub author of the pull request event.
     - name: job-spec
       description: The konflux ci job spec metadata generated.
+    - name: source-repo-url
+      description: Will show the source from where a Pull Request was open. Can be fork or upstream.
+    - name: source-repo-branch
+      description: Get the branch from the fork or upstream repo where pipeline is executed.
   params:
     - name: SNAPSHOT
       description: The JSON string of the Snapshot under test.
@@ -65,6 +69,14 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/sender']
+        - name: SOURCE_REPO_URL
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/source-repo-url']
+        - name: SOURCE_REPO_BRANCH
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/source-branch']
       script: |
         #!/bin/bash
 
@@ -90,7 +102,9 @@ spec:
                 "git_org": "$GIT_ORGANIZATION",
                 "git_repo": "$GIT_REPOSITORY",
                 "commit_sha": "$GIT_REVISION",
-                "event_type": "$EVENT_TYPE"
+                "event_type": "$EVENT_TYPE",
+                "source_repo_url": "$SOURCE_REPO_URL",
+                "source_repo_branch": "$SOURCE_REPO_BRANCH"
             }
         }
         EOF
@@ -112,6 +126,8 @@ spec:
         echo "  PR_AUTHOR: $PR_AUTHOR"
         echo "  COMPONENT_CONTAINER_IMAGE: $COMPONENT_CONTAINER_IMAGE"
         echo "  ORAS_STORAGE_CONTAINER: $(params.oras-container):$(params.test-name)"
+        echo "  SOURCE_REPO_URL: $SOURCE_REPO_URL"
+        echo "  SOURCE_REPO_BRANCH: $SOURCE_REPO_BRANCH"
 
         # Write each environment variable to its respective result file
         echo -n "$EVENT_TYPE" > $(results.test-event-type.path)
@@ -124,3 +140,5 @@ spec:
         echo -n "$PR_AUTHOR" > $(results.pull-request-author.path)
         echo -n $(params.oras-container):$(params.test-name) > $(results.oras-container.path)
         echo -n "$JOB_SPEC" > $(results.job-spec.path)
+        echo -n "$SOURCE_REPO_URL" > $(results.source-repo-url.path)
+        echo -n "$SOURCE_REPO_BRANCH" > $(results.source-repo-branch.path)
