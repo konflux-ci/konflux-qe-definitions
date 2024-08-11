@@ -60,18 +60,46 @@ spec:
             exit 1
         fi
 
-        if [[ PIPELINE_RUN_AGGREGATE_STATUS == "Succeeded" ]]; then
-          echo "[INFO]: Pipeline finished successfully. Skipping pull request comment..."
-          exit 0
+        # Get the authenticated user's login
+        USER_LOGIN=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/user" | jq -r '.login')
+
+        if [ -z "$USER_LOGIN" ]; then
+            echo "[ERROR] Unable to retrieve user login."
+            exit 1
         fi
 
+        # Get all comments on the pull request
+        COMMENTS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$GIT_ORG/$GIT_REPO/issues/$PR_NUMBER/comments")
+
+        # Find and delete any existing comments by the authenticated user
+        COMMENT_IDS=$(echo "$COMMENTS" | jq -r --arg USER_LOGIN "$USER_LOGIN" '.[] | select(.user.login == $USER_LOGIN) | .id')
+        for COMMENT_ID in $COMMENT_IDS; do
+            DELETE_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                -X DELETE \
+                "https://api.github.com/repos/$GIT_ORG/$GIT_REPO/issues/comments/$COMMENT_ID")
+
+            if [ -z "$DELETE_RESPONSE" ]; then
+                echo "[INFO] Existing comment with ID $COMMENT_ID by $USER_LOGIN deleted successfully."
+            else
+                echo "[ERROR] Failed to delete comment with ID $COMMENT_ID. Response: $DELETE_RESPONSE"
+            fi
+        done
+
+        # If the pipeline succeeded, do not post a new comment and exit
+        if [[ "$PIPELINE_RUN_AGGREGATE_STATUS" == "Succeeded" ]]; then
+            echo "[INFO]: Pipeline finished successfully. No new comment will be posted."
+            exit 0
+        fi
+
+        # Generate a commit in Pull Request in case of failure
         COMMENT=$(cat <<EOF
         {
           "body": "@$PR_AUTHOR: The following test finished. In case the test failed, say /retest to rerun all failed tests:\n\nPipelineRun name | Revision | PipelineRun Status | Command\n--- | --- | --- | ---\n$TEST_NAME | $GIT_REVISION | $PIPELINE_RUN_AGGREGATE_STATUS | /retest\n\nTo inspect your test artifacts, ensure you have installed ORAS on your local machine. To inspect all test artifacts, execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $ORAS_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
         }
         EOF
         )
-
 
         RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
