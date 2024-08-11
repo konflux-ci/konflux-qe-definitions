@@ -27,6 +27,9 @@ spec:
       type: string
       description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
       default: None
+    - name: git-revision
+      type: string
+      description: "Git commit revision from Snapshot."
   volumes:
     - name: github-volume
       secret:

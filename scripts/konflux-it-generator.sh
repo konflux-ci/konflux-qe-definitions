@@ -282,6 +282,8 @@ spec:
           value: "\$(tasks.test-metadata.results.git-repo)"
         - name: git-org
           value: "\$(tasks.test-metadata.results.git-org)"
+        - name: git-revision
+          value: "\$(tasks.test-metadata.results.git-revision)"
 EOF
 
     echo "YAML file generated successfully."
