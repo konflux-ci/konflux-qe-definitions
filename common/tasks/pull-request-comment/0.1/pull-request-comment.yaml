@@ -1,0 +1,82 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: pull-request-commenter
+spec:
+  params:
+    - name: test-name
+      type: string
+      description: The name of the test being executed.
+    - name: oras-container
+      type: string
+      description: The ORAS container registry URI to store artifacts.
+    - name: pull-request-author
+      type: string
+      description: The GitHub username of the pull request author.
+    - name: pull-request-number
+      type: string
+      description: The number of the GitHub pull request.
+    - name: git-repo
+      type: string
+      description: The name of the GitHub repository.
+    - name: git-org
+      type: string
+      description: The GitHub organization or user that owns the repository.
+    - name: pipeline-aggregate-status
+      type: string
+      description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
+      default: None
+  volumes:
+    - name: github-volume
+      secret:
+        secretName: github
+  steps:
+    - name: pull-request-comment
+      workingDir: /workspace
+      onError: continue
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      volumeMounts:
+        - name:  github-volume
+          mountPath: /usr/local/github
+      script: |
+        #!/bin/sh
+
+        export TEST_NAME="$(params.test-name)"
+        export PR_AUTHOR="$(params.pull-request-author)"
+        export GIT_REVISION="$(params.git-revision)"
+        export ORAS_CONTAINER="$(params.oras-container)"
+        export GIT_ORG="$(params.git-org)"
+        export GIT_REPO="$(params.git-repo)"
+        export PR_NUMBER="$(params.pull-request-number)"
+        export PIPELINE_RUN_AGGREGATE_STATUS="$(params.pipeline-aggregate-status)"
+
+        GITHUB_TOKEN=$(cat /usr/local/github/token)
+        if [ -z "$GITHUB_TOKEN" ]; then
+            echo "Error: GITHUB_TOKEN env is not set."
+            exit 1
+        fi
+
+        if [[ PIPELINE_RUN_AGGREGATE_STATUS == "Succeeded" ]]; then
+          echo "[INFO]: Pipeline finished successfully. Skipping pull request comment..."
+          exit 0
+        fi
+
+        COMMENT=$(cat <<EOF
+        {
+          "body": "@$PR_AUTHOR: The following test finished, in case test failed say /retest to rerun all failed tests:\n\nPipelineRun name | PipelineRun Status | Command\n--- | ---\n$TEST_NAME | $PIPELINE_RUN_AGGREGATE_STATUS | /retest\n\nTo inspect your test artifacts make sure you have installed ORAS in your local machine. To inspect all test artifacts execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $ORAS_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
+        }
+        EOF
+        )
+
+        RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "$COMMENT" \
+            "https://api.github.com/repos/$GIT_ORG/$GIT_REPO/issues/$PR_NUMBER/comments")
+
+        if echo "$RESPONSE" | grep -q '"id"'; then
+            echo "[INFO] Comment posted successfully."
+        else
+            echo "[ERROR] Failed to post comment. Response: $RESPONSE"
+        fi
