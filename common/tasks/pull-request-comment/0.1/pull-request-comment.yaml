@@ -64,10 +64,11 @@ spec:
 
         COMMENT=$(cat <<EOF
         {
-          "body": "@$PR_AUTHOR: The following test finished, in case test failed say /retest to rerun all failed tests:\n\nPipelineRun name | PipelineRun Status | Command\n--- | ---\n$TEST_NAME | $PIPELINE_RUN_AGGREGATE_STATUS | /retest\n\nTo inspect your test artifacts make sure you have installed ORAS in your local machine. To inspect all test artifacts execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $ORAS_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
+          "body": "@$PR_AUTHOR: The following test finished. In case the test failed, say /retest to rerun all failed tests:\n\nPipelineRun name | Revision | PipelineRun Status | Command\n--- | --- | --- | ---\n$TEST_NAME | $GIT_REVISION | $PIPELINE_RUN_AGGREGATE_STATUS | /retest\n\nTo inspect your test artifacts, ensure you have installed ORAS on your local machine. To inspect all test artifacts, execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $ORAS_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
         }
         EOF
         )
+
 
         RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
