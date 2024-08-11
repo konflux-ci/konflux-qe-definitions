@@ -28,8 +28,8 @@ This [task](./rosa-hcp-provision/rosa-hcp-provision.yaml) provisions an Openshif
 - **cluster-name**: The name of the OpenShift cluster to be created.
 - **machine-type**: The type of AWS EC2 instance to use for the cluster nodes.
 - **replicas**: The number of worker nodes to provision in the cluster (default: 3).
-- **aws-credential-secret**: The secret containing the AWS credentials and AWS account ID for cluster provisioning.
-- **hcp-config-secret**: The secret containing the AWS resources for cluster provisioning. You can refer to this [link](https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html#rosa-hcp-prereqs) to create AWS resources
+- **konflux-test-infra-secret**: The name of secret where testing infrastructures credentials are stored..
+- **cloud-credential-key**: The key secret from konflux-test-infra-secret where all AWS ROSA configurations are stored. You can refer to this [link](https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html#rosa-hcp-prereqs) to create AWS resources
 
 ### Results
 
@@ -54,8 +54,8 @@ This [task](./rosa-hcp-deprovision/rosa-hcp-deprovision.yaml) deprovisions an ex
 - **git-repo**: The name of the GitHub repository.
 - **git-org**: The GitHub organization or user that owns the repository.
 - **cluster-name**: The name of the OpenShift cluster to be deleted.
-- **aws-credential-secret**: The secret containing the AWS credentials and AWS account ID for cluster provisioning.
-- **hcp-config-secret**: The secret containing the AWS resources for cluster provisioning. You can refer to this [link](https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html#rosa-hcp-prereqs) to create AWS resources
+- **konflux-test-infra-secret**: The name of secret where testing infrastructures credentials are stored.
+- **cloud-credential-key**: The key secret from konflux-test-infra-secret where all AWS ROSA configurations are stored. You can refer to this [link](https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html#rosa-hcp-prereqs) to create AWS resources
 
 #### AWS Credential Secret
 
@@ -73,25 +73,34 @@ data:
 type: Opaque
 ```
 
-#### ROSA with HCP  Config Secret
-You need to create a secret including the following data in Konflux, and pass its name to tasks as parameter `hcp-config-secret` 
+### Setting Up Infrastructure Credentials
 
+**Infrastructure credentials** are stored in the vault with the name `konflux-test-infra`. If your team is not part of Konflux, create your own **Infrastructure credentials** in the vault using this structure as a reference:
+
+**github-bot-commenter-token**: "ey...."
+
+**cloud-credential-{*aws-region*}**:
+```json
+{
+  "aws": {
+    "region": "us-east-2",
+    "access-key-secret": "none",
+    "access-key-id": "none",
+    "aws-account-id": "none",
+    "rosa-hcp": {
+      "rosa-token": "ey....",
+      "aws-oidc-config-id": "none",
+      "operator-roles-prefix": "none",
+      "subnets-ids": "none",
+      "install-role-arn": "none",
+      "support-role-arn": "none",
+      "worker-role-arn": "none"
+    }
+  }
+}
 ```
-apiVersion: v1
-kind: Secret
-metadata:
-  name: <REPLACE_ME>
-data:
-  AWS_OIDC_CONFIG_ID: <REPLACE_ME>
-  INSTALL_ROLE_ARN: <REPLACE_ME>
-  OPERATOR_ROLES_PREFIX: <REPLACE_ME>
-  REGION: <REPLACE_ME>
-  ROSA_TOKEN: <REPLACE_ME>
-  SUBNET_IDS: <REPLACE_ME>
-  SUPPORT_ROLE_ARN: <REPLACE_ME>
-  WORKER_ROLE_ARN: <REPLACE_ME>
-type: Opaque
-```
+
+To get all the values from rosa-hcp key please follow instruction from: https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html
 
 ### Steps
 
@@ -122,14 +131,14 @@ spec:
     - name: test-event-type
       description: 'Indicates if the test is triggered by a Pull Request or Push event.'
       default: 'none'
-    - name: aws-credential-secret
-      description: The name of the secret that contains the AWS credentials.
+    - name: konflux-test-infra-secret
+      description: The name of secret where testing infrastructures credentials are stored..
       type: string
       default: 'aws-credential-hacbs-dev'
     - name: hcp-config-secret
       type: string
-      description: The name of the secret that contains configuration data for HCP cluster creation.
-      default: 'hcp-config-us-east-2'
+      description: The key secret from konflux-test-infra-secret where all AWS ROSA configurations are stored.
+      default: 'cloud-credential-key'
     - name: replicas
       description: 'The number of replicas for the cluster nodes.'
       default: '3'

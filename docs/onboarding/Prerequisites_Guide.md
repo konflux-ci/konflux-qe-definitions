@@ -51,6 +51,8 @@ To run integration tests in Konflux, there are several requirements:
 }
 ```
 
+To get all the values from rosa-hcp key please follow instruction from: https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html
+
 ### Configuring E2E Credentials
 
 **E2E credentials** are stored in the vault with the name `konflux-e2e-secrets`. If your team is not part of Konflux, create your own **E2E credentials** in the vault using your own structure.
