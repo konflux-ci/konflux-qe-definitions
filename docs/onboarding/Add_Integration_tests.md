@@ -22,7 +22,9 @@ The Konflux QE team provides a tool to generate integration tests for each Konfl
 To generate the integration test pipeline YAML, use the `generate` command:
 
 ```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/flacatus/konflux-qe-definitions/cli/scripts/konflux-it-generator.sh)" generate --target-dir <target-directory> --name <pipeline-name>
+# Generate Pipeline script
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/konflux-ci/konflux-qe-definitions/main/scripts/konflux-it-generator.sh)" -- generate --target-dir <target-directory> --name <pipeline-name>
+
 ```
 Will create by default a tekton pipeline ready to run in every component in Konflux. Next sections in the document will help to customize the generated pipeline.
 
@@ -42,6 +44,14 @@ Example:
           value: "$(tasks.status)"
 ```
 
+### Konflux component image
+In order to test your component code from Pull Request you need to make sure in the Pipeline generated you are passing the following arguments to `konflux-e2e` task:
+```yaml
+        - name: component-image
+          value: "$(tasks.test-metadata.results.container-image)"
+```
+Is grabing using [test-metadata](../qe-available-tasks/Test-metadata.md) task the result container from the snapshot.
+
 # Add Integration Test to Konflux (via UI)
 
 In Konflux, you can add integration tests to verify that the individual components of your application integrate correctly, forming a complete and functional application. Konflux runs these integration tests on the container images of components before their release.
@@ -56,14 +66,16 @@ In Konflux, you can add integration tests to verify that the individual componen
 8. Select **Add integration test**.
 9. To start building a new component, either open a new pull request (PR) that targets the tracked branch of the component in the GitHub repository, or comment '/retest' on an existing PR.
 
+Before clicking on **Create** please configure the necessary params for your Konflux E2E tests, explained in next chapter.
+
 ## Configure Konflux E2E parameters
 
-In order to make your Integration Test pipeline to run in Konflux you need to create some params in your integration test name you just added to Konflux:
+In order to make your Integration Test pipeline to run in Konflux you need to create some params in the UI or cli by modify:
 
 - **konflux-test-infra-secret**: The secret name to allow Integration tests to deploy ephemeral clusters or another operations like pull request comment. Check more details about [*konflux-test-infra-secret*](./Prerequisites_Guide.md). By default is **konflux-test-infra**.
 
-- *cloud-credential-key*. Makes reference to the key from *konflux-test-infra* secret where is stored the AWS credential to deploy ROSA. By default in Konflux vault the secret is created with 2 keys: cloud-credential-key-us-west-2; this one should be used by all konflux components, cloud-credential-key-us-east-2 only used by [infra-deployments](https://github.com/redhat-appstudio/infra-deployments) repo or [e2e](https://github.com/konflux-ci/e2e-tests) repo in Konflux.
+- **cloud-credential-key**. Makes reference to the key from *konflux-test-infra* secret where is stored the AWS credential to deploy ROSA. By default in Konflux vault the secret is created with 2 keys: cloud-credential-key-us-west-2; this one should be used by all konflux components, cloud-credential-key-us-east-2 only used by [infra-deployments](https://github.com/redhat-appstudio/infra-deployments) repo or [e2e](https://github.com/konflux-ci/e2e-tests) repo in Konflux.
 
-- *quality-dashboard-api*. In case quality dashboard task is activated set this param pointing to Quality Dashboard backend to send results. Default is: `https://backend-quality-dashboard.apps.stone-stg-rh01.l2vh.p1.openshiftapps.com`
+- **quality-dashboard-api**. In case quality dashboard task is activated set this param pointing to Quality Dashboard backend to send results. Default is: `https://backend-quality-dashboard.apps.stone-stg-rh01.l2vh.p1.openshiftapps.com`
 
-- *oras-container*. Container where all artifacts will be store tests artifacts from pipelines such as Junit, Cluster artifacts etc. Konflux will use `quay.io/konflux-test-storage` org. Every component need to create a repository in konflux-test-storage. After create the repo, set the para to: `quay.io/konflux-test-storage/<component-name>`.
+- **oras-container**. Container where all artifacts will be store tests artifacts from pipelines such as Junit, Cluster artifacts etc. Konflux will use `quay.io/konflux-test-storage` org. Every component need to create a repository in konflux-test-storage. After create the repo, set the para to: `quay.io/konflux-test-storage/<component-name>`.
