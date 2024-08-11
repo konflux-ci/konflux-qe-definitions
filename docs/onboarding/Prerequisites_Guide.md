@@ -51,7 +51,7 @@ To run integration tests in Konflux, there are several requirements:
 }
 ```
 
-To get all the values from rosa-hcp key please follow instruction from: https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html
+To get all the values from rosa-hcp key please Red Hat [documentation](https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html).
 
 ### Configuring E2E Credentials
 
