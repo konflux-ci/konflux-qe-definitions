@@ -49,9 +49,6 @@ spec:
     - name: oras-credentials-volume
       secret:
         secretName: oras-credentials
-    - name: github-volume
-      secret:
-        secretName: github
   steps:
     - name: collect-artifacts
       workingDir: /workspace/cluster-artifacts
@@ -66,7 +63,7 @@ spec:
           exit 0
         fi
 
-        curl -sSL https://raw.githubusercontent.com/konflux-qe-incubator/konflux-qe-definitions/onboard_rhtap_e2e/scripts/gather-extra.sh | bash
+        curl -sSL https://raw.githubusercontent.com/konflux-ci/konflux-qe-definitions/main/scripts/gather-extra.sh | bash
     - name: inspect-upload-artifacts
       workingDir: /workspace
       onError: continue
