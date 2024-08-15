@@ -134,3 +134,44 @@ spec:
         fi
 
         echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Done"
+    - name: remove-tag-from-subnets
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      volumeMounts:
+        - name:  konflux-test-infra-volume
+          mountPath: /usr/local/konflux-test-infra
+      script: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        CLUSTER_NAME=$(params.cluster-name)
+        REGION=$(jq -r '.aws["region"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        AWS_ACCESS_KEY_ID=$(jq -r '.aws["access-key-id"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        AWS_SECRET_ACCESS_KEY=$(jq -r '.aws["access-key-secret"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        ROSA_TOKEN=$(jq -r '.aws["rosa-hcp"]["rosa-token"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        SUBNET_IDS=$(jq -r '.aws["rosa-hcp"]["subnets-ids"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+
+        config_aws_creds() {
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            aws configure set region "$REGION"
+        }
+
+        echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Started to remove tags of cluster [$CLUSTER_NAME]..."
+
+        printf "INFO: Logging in to your Red Hat account...\n"
+        config_aws_creds
+        rosa login --token="$ROSA_TOKEN"
+
+        if [[ -n "$CLUSTER_NAME"  ]]; then
+            cluster_id=$(rosa --region "$REGION"  describe cluster --cluster="$CLUSTER_NAME" -o json | jq -r .id)
+            echo "INFO: Cluster ID: $cluster_id"
+
+            echo "INFO: Removing tag from subnets [$SUBNET_IDS]..."
+            new_subnet_ids="${SUBNET_IDS//,/ }"
+            aws --region "$REGION" ec2 delete-tags --resources $new_subnet_ids --tags Key="kubernetes.io/cluster/${cluster_id}"
+
+            echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Done"
+        else
+          echo "INFO: No OCP cluster tag needs to be removed."
+        fi
