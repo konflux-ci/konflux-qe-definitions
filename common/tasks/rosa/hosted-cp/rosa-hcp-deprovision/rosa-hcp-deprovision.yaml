@@ -151,16 +151,13 @@ spec:
         ROSA_TOKEN=$(jq -r '.aws["rosa-hcp"]["rosa-token"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
         SUBNET_IDS=$(jq -r '.aws["rosa-hcp"]["subnets-ids"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
 
-        config_aws_creds() {
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region "$REGION"
-        }
+        aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+        aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+        aws configure set region "$REGION"
 
         echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Started to remove tags of cluster [$CLUSTER_NAME]..."
 
         printf "INFO: Logging in to your Red Hat account...\n"
-        config_aws_creds
         rosa login --token="$ROSA_TOKEN"
 
         if [[ -n "$CLUSTER_NAME"  ]]; then
@@ -192,11 +189,9 @@ spec:
         AWS_ACCESS_KEY_ID=$(jq -r '.aws["access-key-id"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
         AWS_SECRET_ACCESS_KEY=$(jq -r '.aws["access-key-secret"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
 
-        config_aws_creds() {
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region "$REGION"
-        }
+        aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+        aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+        aws configure set region "$REGION"
 
         echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Started to remove load balancers of cluster [$CLUSTER_NAME]..."
 
