@@ -175,3 +175,53 @@ spec:
         else
           echo "INFO: No OCP cluster tag needs to be removed."
         fi
+    - name: remove-load-balancers
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      volumeMounts:
+        - name:  konflux-test-infra-volume
+          mountPath: /usr/local/konflux-test-infra
+      script: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        export CLUSTER_NAME REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+
+        CLUSTER_NAME=$(params.cluster-name)
+        REGION=$(jq -r '.aws["region"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        AWS_ACCESS_KEY_ID=$(jq -r '.aws["access-key-id"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+        AWS_SECRET_ACCESS_KEY=$(jq -r '.aws["access-key-secret"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
+
+        config_aws_creds() {
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            aws configure set region "$REGION"
+        }
+
+        echo "INFO: [$(date +"%Y/%m/%d %H:%M:%S")] Started to remove load balancers of cluster [$CLUSTER_NAME]..."
+
+        ELB_TAG_KEY="api.openshift.com/name"
+        ELB_TAG_VALUE=$(params.cluster-name)
+
+        # Get all load balancer ARNs
+        all_arns=$(aws elbv2 describe-load-balancers --query 'LoadBalancers[*].LoadBalancerArn' --output text)
+
+        # Process the ARNs in batches of 20 to avoid errors like:
+        # An error occurred (ValidationError) when calling the DescribeTags operation:
+        # Cannot have more than 20 resources described
+
+        batch_size=20
+        arns_to_delete=()
+
+        for arn in $all_arns; do
+            arns_to_delete+=($arn)
+            
+            if [ ${#arns_to_delete[@]} -eq $batch_size ]; then
+                aws elbv2 describe-tags --resource-arns ${arns_to_delete[@]} \
+                --query "TagDescriptions[?Tags[?Key=='$ELB_TAG_KEY' && Value=='$ELB_TAG_VALUE']].ResourceArn" --output text | while read matched_arn; do
+                    echo "Deleting load balancer with ARN: $matched_arn"
+                    aws elbv2 delete-load-balancer --load-balancer-arn $matched_arn
+                done
+                arns_to_delete=()
+            fi
+        done
