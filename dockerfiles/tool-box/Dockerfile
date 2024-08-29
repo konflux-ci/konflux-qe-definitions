@@ -2,15 +2,15 @@
 FROM registry.access.redhat.com/ubi9/ubi:9.3-1610@sha256:66233eebd72bb5baa25190d4f55e1dc3fff3a9b77186c1f91a0abdb274452072 AS builder
 
 # renovate: datasource=repology depName=homebrew/openshift-cli
-ARG OC_VERSION=4.14.8
+ARG OC_VERSION=4.15.9
 # renovate: datasource=github-releases depName=openshift/rosa
-ARG ROSA_VERSION=v1.2.38
+ARG ROSA_VERSION=v1.2.45
 # renovate: datasource=github-releases depName=stedolan/jq
 ARG JQ_VERSION=1.6
 # renovate: datasource=github-releases depName=mikefarah/yq
 ARG YQ_VERSION=4.43.1
 
-ARG ORAS_VERSION=1.1.0
+ARG ORAS_VERSION=1.2.0
 
 ARG SHELLCHECK_VERSION=stable
 
