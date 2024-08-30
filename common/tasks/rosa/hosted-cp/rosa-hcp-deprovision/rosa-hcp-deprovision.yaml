@@ -91,9 +91,19 @@ spec:
         QUAY_PASSWORD=$(cat /usr/local/oras-credentials/quay-password)
         oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
 
-        echo '{"doc": "README.md"}' > config.json
+        TEMP_ANNOTATION_FILE="$(mktemp)"
+
+        # Fetch the manifest annotations for the container
+        MANIFESTS=$(oras manifest fetch "$(params.oras-container)" | jq .annotations) || {
+            echo "[Error] Failed to fetch manifest from ${OCI_STORAGE_CONTAINER}" >&2
+            exit 1
+        }
+
+        # Create and save the JSON object
+        jq -n --argjson manifest "$MANIFESTS" '{ "$manifest": $manifest }' > "${TEMP_ANNOTATION_FILE}"
+
         oras pull "$(params.oras-container)"
-        oras push "$(params.oras-container)" --config config.json:application/vnd.acme.rocket.config.v1+json \
+        oras push "$(params.oras-container)" --annotation-file "${TEMP_ANNOTATION_FILE}" \
           ./:application/vnd.acme.rocket.docs.layer.v1+tar
     - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest

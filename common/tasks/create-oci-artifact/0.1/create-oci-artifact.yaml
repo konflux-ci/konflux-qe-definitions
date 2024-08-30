@@ -48,8 +48,19 @@ spec:
         jq -n --arg exp "$(params.oci-container-expiration)" --arg title "Artifact store for pipelinerun: $(params.test-name)" \
           '{"$manifest": {"quay.expires-after": $exp, "org.opencontainers.image.title": $title}}' > "${TEMP_ANNOTATION_FILE}"
 
-        # Push the container to oci registry
-        oras push "${OCI_STORAGE_CONTAINER}" --username="${OCI_STORAGE_USERNAME}" --password="${OCI_STORAGE_TOKEN}" \
-          --config /dev/null:application/vnd.oras.config.v1+json --annotation-file "${TEMP_ANNOTATION_FILE}"
-
-        exit 1
+        # Push the container to oci registry. Try 5 times in case
+        for i in {1..5}; do
+            if oras push "${OCI_STORAGE_CONTAINER}" --username="${OCI_STORAGE_USERNAME}" --password="${OCI_STORAGE_TOKEN}" \
+                --config /dev/null:application/vnd.oras.config.v1+json --annotation-file "${TEMP_ANNOTATION_FILE}"; then
+                echo "[INFO] oras push succeeded on attempt $i."
+                break
+            else
+                echo "[WARNING] oras push failed on attempt $i. Retrying..."
+                sleep 5
+            fi
+            # Exit with error if all attempts fail
+            if [ $i -eq 5 ]; then
+                echo "[ERROR] oras push failed after 5 attempts."
+                exit 1
+            fi
+        done
