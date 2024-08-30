@@ -46,9 +46,6 @@ spec:
     - name: konflux-test-infra-volume
       secret:
         secretName: "$(params.konflux-test-infra-secret)"
-    - name: oras-credentials-volume
-      secret:
-        secretName: oras-credentials
   steps:
     - name: collect-artifacts
       workingDir: /workspace/cluster-artifacts
@@ -69,8 +66,8 @@ spec:
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  oras-credentials-volume
-          mountPath: /usr/local/oras-credentials
+        - name:  konflux-test-infra-volume
+          mountPath: /usr/local/konflux-test-infra
       script: |
         #!/bin/sh
 
@@ -87,9 +84,12 @@ spec:
           exit 0
         fi
 
-        QUAY_USERNAME=$(cat /usr/local/oras-credentials/quay-username)
-        QUAY_PASSWORD=$(cat /usr/local/oras-credentials/quay-password)
-        oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
+        export QUAY_USERNAME QUAY_TOKEN
+
+        QUAY_USERNAME=$(jq -r '."quay-username"' /usr/local/konflux-test-infra/oci-storage)
+        QUAY_TOKEN=$(jq -r '."quay-token"' /usr/local/konflux-test-infra/oci-storage)
+
+        oras login -u $QUAY_USERNAME -p $QUAY_TOKEN quay.io
 
         echo '{"doc": "README.md"}' > config.json
         oras pull "$(params.oras-container)"

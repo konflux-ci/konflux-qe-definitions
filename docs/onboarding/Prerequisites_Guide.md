@@ -34,24 +34,34 @@ To run integration tests in Konflux, there are several requirements:
 ```json
 {
   "aws": {
-    "region": "us-east-2",
-    "access-key-secret": "none",
-    "access-key-id": "none",
-    "aws-account-id": "none",
+    "region": "********",
+    "access-key-secret": "********",
+    "access-key-id": "********",
+    "aws-account-id": "********",
     "rosa-hcp": {
-      "rosa-token": "ey....",
-      "aws-oidc-config-id": "none",
-      "operator-roles-prefix": "none",
-      "subnets-ids": "none",
-      "install-role-arn": "none",
-      "support-role-arn": "none",
-      "worker-role-arn": "none"
+      "rosa-token": "********",
+      "aws-oidc-config-id": "********",
+      "operator-roles-prefix": "********",
+      "subnets-ids": "********",
+      "install-role-arn": "********",
+      "support-role-arn": "********",
+      "worker-role-arn": "********"
     }
   }
 }
 ```
 
 To get all the values from rosa-hcp key please Red Hat [documentation](https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html).
+
+**oci-storage**:
+```json
+{
+  "quay-token": "********",
+  "quay-username": "********"
+}
+```
+
+OCI storage credentials are used to push tests artifacts to quay.io. More information about konflux OCI artifacts can be found [here](../onboarding/artifacts-storage/oras.md).
 
 ### Configuring E2E Credentials
 
