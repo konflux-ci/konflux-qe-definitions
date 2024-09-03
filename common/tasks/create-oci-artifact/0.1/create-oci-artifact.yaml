@@ -65,7 +65,6 @@ spec:
         for i in {1..5}; do
             if oras push "${OCI_STORAGE_CONTAINER}" --username="${OCI_STORAGE_USERNAME}" --password="${OCI_STORAGE_TOKEN}" \
                 --config /dev/null:application/vnd.oras.config.v1+json --annotation-file "${TEMP_ANNOTATION_FILE}"; then
-                echo "[INFO] oras push succeeded on attempt $i."
                 break
             else
                 echo "[WARNING] oras push failed on attempt $i. Retrying..."

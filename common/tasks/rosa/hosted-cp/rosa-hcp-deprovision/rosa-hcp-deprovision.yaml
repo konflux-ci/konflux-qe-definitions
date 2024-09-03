@@ -45,10 +45,7 @@ spec:
   volumes:
     - name: konflux-test-infra-volume
       secret:
-        secretName: "$(params.konflux-test-infra-secret)"
-    - name: oras-credentials-volume
-      secret:
-        secretName: oras-credentials
+        secretName: konflux-test-infra
   steps:
     - name: collect-artifacts
       workingDir: /workspace/cluster-artifacts
@@ -69,8 +66,8 @@ spec:
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  oras-credentials-volume
-          mountPath: /usr/local/oras-credentials
+        - name:  konflux-test-infra-volume
+          mountPath: /usr/local/konflux-test-infra
       script: |
         #!/bin/sh
 
@@ -87,10 +84,9 @@ spec:
           exit 0
         fi
 
-        QUAY_USERNAME=$(cat /usr/local/oras-credentials/quay-username)
-        QUAY_PASSWORD=$(cat /usr/local/oras-credentials/quay-password)
-        oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
-
+        OCI_STORAGE_USERNAME="$(jq -r '."quay-username"' /usr/local/konflux-test-infra/oci-storage)"
+        OCI_STORAGE_TOKEN="$(jq -r '."quay-token"' /usr/local/konflux-test-infra/oci-storage)"
+        OCI_STORAGE_CONTAINER="$(params.oras-container)"
         TEMP_ANNOTATION_FILE="$(mktemp)"
 
         # Fetch the manifest annotations for the container
@@ -102,9 +98,18 @@ spec:
         # Create and save the JSON object
         jq -n --argjson manifest "$MANIFESTS" '{ "$manifest": $manifest }' > "${TEMP_ANNOTATION_FILE}"
 
-        oras pull "$(params.oras-container)"
-        oras push "$(params.oras-container)" --annotation-file "${TEMP_ANNOTATION_FILE}" \
-          ./:application/vnd.acme.rocket.docs.layer.v1+tar
+        oras pull "${OCI_STORAGE_CONTAINER}"
+
+        attempt=1
+        while ! oras push "$ORAS_CONTAINER" --username="${OCI_STORAGE_USERNAME}" --password="${OCI_STORAGE_TOKEN}" --annotation-file "${TEMP_ANNOTATION_FILE}" ./:application/vnd.acme.rocket.docs.layer.v1+tar; do
+            if [[ $attempt -ge 5 ]]; then
+                log "ERROR" "oras push failed after $attempt attempts."
+                exit 1
+            fi
+            log "WARNING" "oras push failed (attempt $attempt). Retrying in 5 seconds..."
+            sleep 5
+            ((attempt++))
+        done
     - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
