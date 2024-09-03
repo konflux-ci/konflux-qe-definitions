@@ -45,10 +45,7 @@ spec:
   volumes:
     - name: konflux-test-infra-volume
       secret:
-        secretName: "$(params.konflux-test-infra-secret)"
-    - name: oras-credentials-volume
-      secret:
-        secretName: oras-credentials
+        secretName: konflux-test-infra
   steps:
     - name: collect-artifacts
       workingDir: /workspace/cluster-artifacts
@@ -69,32 +66,51 @@ spec:
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  oras-credentials-volume
-          mountPath: /usr/local/oras-credentials
+        - name:  konflux-test-infra-volume
+          mountPath: /usr/local/konflux-test-infra
       script: |
         #!/bin/sh
 
-        if [[ $(params.pipeline-aggregate-status) == "Succeeded" ]]; then
-          echo "[INFO]: Pipeline finished successfully. Skipping artifacts inspection..."
-          exit 0
+        if [[ "$(params.pipeline-aggregate-status)" == "Succeeded" ]]; then
+            echo -e "[INFO]: Pipeline finished successfully. Skipping artifacts inspection..."
+            exit 0
         fi
 
         trufflehog filesystem /workspace --only-verified --fail
         EXIT_CODE=$?
 
         if [ $EXIT_CODE -ne 0 ]; then
-          echo "[ERROR] Found secrets in artifacts... Container artifacts will not be uploaded to oci registry due to security reasons."
-          exit 0
+            echo -e "[ERROR]: Found secrets in artifacts... Container artifacts will not be uploaded to OCI registry due to security reasons."
+            exit 1
         fi
 
-        QUAY_USERNAME=$(cat /usr/local/oras-credentials/quay-username)
-        QUAY_PASSWORD=$(cat /usr/local/oras-credentials/quay-password)
-        oras login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io
+        OCI_STORAGE_USERNAME="$(jq -r '."quay-username"' /usr/local/konflux-test-infra/oci-storage)"
+        OCI_STORAGE_TOKEN="$(jq -r '."quay-token"' /usr/local/konflux-test-infra/oci-storage)"
+        OCI_STORAGE_CONTAINER="$(params.oras-container)"
+        TEMP_ANNOTATION_FILE="$(mktemp)"
 
-        echo '{"doc": "README.md"}' > config.json
-        oras pull "$(params.oras-container)"
-        oras push "$(params.oras-container)" --config config.json:application/vnd.acme.rocket.config.v1+json \
-          ./:application/vnd.acme.rocket.docs.layer.v1+tar
+        # Fetch the manifest annotations for the container
+        MANIFESTS=$(oras manifest fetch "$OCI_STORAGE_CONTAINER" | jq .annotations) || {
+            echo -e "[ERROR]: Failed to fetch manifest from $OCI_STORAGE_CONTAINER"
+            exit 1
+        }
+
+        # Create and save the JSON object
+        jq -n --argjson manifest "$MANIFESTS" '{ "$manifest": $manifest }' > "${TEMP_ANNOTATION_FILE}"
+
+        oras pull "$OCI_STORAGE_CONTAINER"
+
+        attempt=1
+        while ! oras push "$OCI_STORAGE_CONTAINER" --username="${OCI_STORAGE_USERNAME}" --password="${OCI_STORAGE_TOKEN}" --annotation-file "${TEMP_ANNOTATION_FILE}" ./:application/vnd.acme.rocket.docs.layer.v1+tar; do
+            if [[ $attempt -ge 5 ]]; then
+                echo -e "[ERROR]: oras push failed after $attempt attempts."
+                rm -f "${TEMP_ANNOTATION_FILE}"
+                exit 1
+            fi
+            echo -e "[WARNING]: oras push failed (attempt $attempt). Retrying in 5 seconds..."
+            sleep 5
+            ((attempt++))
+        done
     - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
