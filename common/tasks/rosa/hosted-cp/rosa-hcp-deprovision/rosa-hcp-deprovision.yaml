@@ -71,17 +71,17 @@ spec:
       script: |
         #!/bin/sh
 
-        if [[ $(params.pipeline-aggregate-status) == "Succeeded" ]]; then
-          echo "[INFO]: Pipeline finished successfully. Skipping artifacts inspection..."
-          exit 0
+        if [[ "$(params.pipeline-aggregate-status)" == "Succeeded" ]]; then
+            echo -e "[INFO]: Pipeline finished successfully. Skipping artifacts inspection..."
+            exit 0
         fi
 
         trufflehog filesystem /workspace --only-verified --fail
         EXIT_CODE=$?
 
         if [ $EXIT_CODE -ne 0 ]; then
-          echo "[ERROR] Found secrets in artifacts... Container artifacts will not be uploaded to oci registry due to security reasons."
-          exit 0
+            echo -e "[ERROR]: Found secrets in artifacts... Container artifacts will not be uploaded to OCI registry due to security reasons."
+            exit 1
         fi
 
         OCI_STORAGE_USERNAME="$(jq -r '."quay-username"' /usr/local/konflux-test-infra/oci-storage)"
@@ -90,23 +90,24 @@ spec:
         TEMP_ANNOTATION_FILE="$(mktemp)"
 
         # Fetch the manifest annotations for the container
-        MANIFESTS=$(oras manifest fetch "$(params.oras-container)" | jq .annotations) || {
-            echo "[Error] Failed to fetch manifest from ${OCI_STORAGE_CONTAINER}" >&2
+        MANIFESTS=$(oras manifest fetch "$OCI_STORAGE_CONTAINER" | jq .annotations) || {
+            echo -e "[ERROR]: Failed to fetch manifest from $OCI_STORAGE_CONTAINER"
             exit 1
         }
 
         # Create and save the JSON object
         jq -n --argjson manifest "$MANIFESTS" '{ "$manifest": $manifest }' > "${TEMP_ANNOTATION_FILE}"
 
-        oras pull "${OCI_STORAGE_CONTAINER}"
+        oras pull "$OCI_STORAGE_CONTAINER"
 
         attempt=1
-        while ! oras push "$ORAS_CONTAINER" --username="${OCI_STORAGE_USERNAME}" --password="${OCI_STORAGE_TOKEN}" --annotation-file "${TEMP_ANNOTATION_FILE}" ./:application/vnd.acme.rocket.docs.layer.v1+tar; do
+        while ! oras push "$OCI_STORAGE_CONTAINER" --username="${OCI_STORAGE_USERNAME}" --password="${OCI_STORAGE_TOKEN}" --annotation-file "${TEMP_ANNOTATION_FILE}" ./:application/vnd.acme.rocket.docs.layer.v1+tar; do
             if [[ $attempt -ge 5 ]]; then
-                log "ERROR" "oras push failed after $attempt attempts."
+                echo -e "[ERROR]: oras push failed after $attempt attempts."
+                rm -f "${TEMP_ANNOTATION_FILE}"
                 exit 1
             fi
-            log "WARNING" "oras push failed (attempt $attempt). Retrying in 5 seconds..."
+            echo -e "[WARNING]: oras push failed (attempt $attempt). Retrying in 5 seconds..."
             sleep 5
             ((attempt++))
         done
