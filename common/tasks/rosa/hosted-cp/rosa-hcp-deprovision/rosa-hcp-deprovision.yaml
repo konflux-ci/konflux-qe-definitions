@@ -11,7 +11,7 @@ spec:
     - name: ocp-login-command
       type: string
       description: Command to log in to the OpenShift cluster.
-    - name: oras-container
+    - name: oci-container
       type: string
       description: The ORAS container registry URI to store artifacts.
     - name: pull-request-author
@@ -86,7 +86,7 @@ spec:
 
         OCI_STORAGE_USERNAME="$(jq -r '."quay-username"' /usr/local/konflux-test-infra/oci-storage)"
         OCI_STORAGE_TOKEN="$(jq -r '."quay-token"' /usr/local/konflux-test-infra/oci-storage)"
-        OCI_STORAGE_CONTAINER="$(params.oras-container)"
+        OCI_STORAGE_CONTAINER="$(params.oci-container)"
         TEMP_ANNOTATION_FILE="$(mktemp)"
 
         # Fetch the manifest annotations for the container

@@ -8,7 +8,7 @@ spec:
     - name: test-name
       type: string
       description: The name of the test being executed.
-    - name: oras-container
+    - name: oci-container
       type: string
       description: The ORAS container used to store all test artifacts. From this container will generate one with test tag.
     - name: quality-dashboard-api
@@ -78,14 +78,14 @@ spec:
         echo "[INFO] metadata.json content:"
         cat metadata.json
         
-        oras pull "$(params.oras-container)" -o ./oras-output
+        oras pull "$(params.oci-container)"
         
         # Try to get the first file starting with "qd-report"
-        QD_REPORT_FILENAME=$(find ./oras-output -name "qd-report*" | head -1)
+        QD_REPORT_FILENAME=$(find ./ -name "qd-report*" | head -1)
 
         # If no "qd-report" file is found, get the first file starting with "e2e-report"
         if [ -z "$QD_REPORT_FILENAME" ]; then
-            QD_REPORT_FILENAME=$(find ./oras-output -name "e2e-report*" | head -1)
+            QD_REPORT_FILENAME=$(find ./ -name "e2e-report*" | head -1)
         fi
 
         echo "[INFO] Report filename: $QD_REPORT_FILENAME"
