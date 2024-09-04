@@ -19,8 +19,6 @@ spec:
       description: The GitHub organization from which the test is originating.
     - name: git-repo
       description: The repository from which the test is originating.
-    - name: oras-container
-      description: The ORAS container used to store all test artifacts.
     - name: pull-request-author
       description: The GitHub author of the pull request event.
     - name: job-spec
@@ -35,9 +33,6 @@ spec:
     - name: test-name
       type: string
       description: The name of the test being executed.
-    - name: oras-container
-      type: string
-      description: The ORAS container used to store all test artifacts. From this container will generate one with test tag.
   steps:
     - name: test-metadata
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
@@ -125,7 +120,6 @@ spec:
         echo "  GIT_REVISION: $GIT_REVISION"
         echo "  PR_AUTHOR: $PR_AUTHOR"
         echo "  COMPONENT_CONTAINER_IMAGE: $COMPONENT_CONTAINER_IMAGE"
-        echo "  ORAS_STORAGE_CONTAINER: $(params.oras-container):$(params.test-name)"
         echo "  SOURCE_REPO_URL: $SOURCE_REPO_URL"
         echo "  SOURCE_REPO_BRANCH: $SOURCE_REPO_BRANCH"
 
@@ -138,7 +132,6 @@ spec:
         echo -n "$GIT_URL" > $(results.git-url.path)
         echo -n "$GIT_REVISION" > $(results.git-revision.path)
         echo -n "$PR_AUTHOR" > $(results.pull-request-author.path)
-        echo -n $(params.oras-container):$(params.test-name) > $(results.oras-container.path)
         echo -n "$JOB_SPEC" > $(results.job-spec.path)
         echo -n "$SOURCE_REPO_URL" > $(results.source-repo-url.path)
         echo -n "$SOURCE_REPO_BRANCH" > $(results.source-repo-branch.path)

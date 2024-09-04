@@ -8,7 +8,7 @@ spec:
     - name: test-name
       type: string
       description: The name of the test being executed.
-    - name: oras-container
+    - name: oci-container
       type: string
       description: The ORAS container registry URI to store artifacts.
     - name: pull-request-author
@@ -31,30 +31,29 @@ spec:
       type: string
       description: "Git commit revision from Snapshot."
   volumes:
-    - name: github-volume
+    - name: konflux-test-infra-volume
       secret:
-        secretName: github
+        secretName: konflux-test-infra
   steps:
     - name: pull-request-comment
       workingDir: /workspace
-      onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  github-volume
-          mountPath: /usr/local/github
+        - name:  konflux-test-infra-volume
+          mountPath: /usr/local/konflux-test-infra
       script: |
         #!/bin/sh
 
         export TEST_NAME="$(params.test-name)"
         export PR_AUTHOR="$(params.pull-request-author)"
         export GIT_REVISION="$(params.git-revision)"
-        export ORAS_CONTAINER="$(params.oras-container)"
+        export OCI_STORAGE_CONTAINER="$(params.oci-container)"
         export GIT_ORG="$(params.git-org)"
         export GIT_REPO="$(params.git-repo)"
         export PR_NUMBER="$(params.pull-request-number)"
         export PIPELINE_RUN_AGGREGATE_STATUS="$(params.pipeline-aggregate-status)"
 
-        GITHUB_TOKEN=$(cat /usr/local/github/token)
+        GITHUB_TOKEN="$(cat /usr/local/konflux-test-infra/github-bot-commenter-token)"
         if [ -z "$GITHUB_TOKEN" ]; then
             echo "Error: GITHUB_TOKEN env is not set."
             exit 1
@@ -96,7 +95,7 @@ spec:
         # Generate a commit in Pull Request in case of failure
         COMMENT=$(cat <<EOF
         {
-          "body": "@$PR_AUTHOR: The following test finished. In case the test failed, say /retest to rerun all failed tests:\n\nPipelineRun name | Revision | PipelineRun Status | Command\n--- | --- | --- | ---\n$TEST_NAME | $GIT_REVISION | $PIPELINE_RUN_AGGREGATE_STATUS | /retest\n\nTo inspect your test artifacts, ensure you have installed ORAS on your local machine. To inspect all test artifacts, execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $ORAS_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
+          "body": "@$PR_AUTHOR: The following test finished. In case the test failed, say /retest to rerun all failed tests:\n\nPipelineRun name | Revision | PipelineRun Status | Command\n--- | --- | --- | ---\n$TEST_NAME | $GIT_REVISION | $PIPELINE_RUN_AGGREGATE_STATUS | /retest\n\nTo inspect your test artifacts, ensure you have installed ORAS on your local machine. To inspect all test artifacts, execute:\n\n\`\`\`shell\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $OCI_STORAGE_CONTAINER\n\`\`\`\n\nFor instructions on how to install ORAS, please refer to the [ORAS installation guide](https://oras.land/docs/installation)."
         }
         EOF
         )
