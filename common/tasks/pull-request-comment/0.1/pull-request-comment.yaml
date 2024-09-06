@@ -51,7 +51,6 @@ spec:
 
         export TEST_NAME="$(params.test-name)"
         export PR_AUTHOR="$(params.pull-request-author)"
-        export GIT_REVISION="$(params.git-revision)"
         export OCI_STORAGE_CONTAINER="$(params.oci-container)"
         export GIT_ORG="$(params.git-org)"
         export GIT_REPO="$(params.git-repo)"
@@ -100,14 +99,13 @@ spec:
         export INTEGRATION_TEST_CONSOLE_URL="${BUILD_CONSOLE_URL%/*}/$(params.test-name)"
 
         BODY_HEADER="@${PR_AUTHOR}: The following test has ${PIPELINE_RUN_AGGREGATE_STATUS}, say **/retest** to rerun failed tests.\n\n"
-        BODY_TEST_SUMMARY="| PipelineRun Name | Status | Rerun command | Build Log | Test Log |\n|------------------|--------|---------|-------------------|------------------|\n| \`$TEST_NAME\`    | **$PIPELINE_RUN_AGGREGATE_STATUS** | \`/retest\` | [View Pipeline Log]($BUILD_LOG_CONSOLE_URL) | [View Test Logs]($INTEGRATION_TEST_CONSOLE_URL) |\n\n"
+        BODY_TEST_SUMMARY="| PipelineRun Name | Status | Rerun command | Build Log | Test Log |\n|------------------|--------|---------|-------------------|------------------|\n| \`$TEST_NAME\`    | **$PIPELINE_RUN_AGGREGATE_STATUS** | \`/retest\` | [View Pipeline Log]($BUILD_CONSOLE_URL) | [View Test Logs]($INTEGRATION_TEST_CONSOLE_URL) |\n\n"
         BODY_ARTIFACTS="### Inspecting Test Artifacts\nTo inspect your test artifacts, follow these steps:\n\n1. Install **ORAS** (see the [ORAS installation guide](https://oras.land/docs/installation)).\n2. Download artifacts with the following commands:\n\n\`\`\`sh\nmkdir -p oras-artifacts\ncd oras-artifacts\noras pull $OCI_STORAGE_CONTAINER\n\`\`\`\n\n"
-        BODY_FOOTER="If you need help, feel free to ask. Happy testing!\n\n---\n*Generated automatically by the CI pipeline.*"
 
         # Combine body components into the final JSON body
         COMMENT=$(cat <<EOF
         {
-          "body": "${BODY_HEADER}${BODY_TEST_SUMMARY}${BODY_ARTIFACTS}${BODY_FOOTER}"
+          "body": "${BODY_HEADER}${BODY_TEST_SUMMARY}${BODY_ARTIFACTS}"
         }
         EOF
         )
