@@ -4,9 +4,15 @@ kind: Task
 metadata:
   name: sprayproxy-register-server
 spec:
+  description: |
+    The `sprayproxy-register-server` Task is responsible for registering the Pipelines as Code server in SprayProxy server.
+    This task logs into an ephemeral OpenShift cluster using a provided login command, retrieves the PAC controller's webhook URL,
+    and sends this information to the SprayProxy server for registration. The task attempts the registration multiple times if needed
+    and verifies the registration by listing the registered PAC servers on the SprayProxy server.
   params:
     - name: ocp-login-command
       type: string
+      description: The OpenShift login command used to authenticate to the cluster.
   steps:
     - name: provision
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest

@@ -3,29 +3,34 @@ kind: Task
 metadata:
   name: rosa-hcp-provision
 spec:
+  description: |
+    The `rosa-hcp-provision` task automates the creation and provisioning of an ephemeral OpenShift cluster using Red Hat OpenShift on AWS (ROSA) with Hosted Control Planes (HCP).
+    The task takes several parameters, including the OpenShift version, AWS machine type, and cluster name, to configure and deploy the cluster on AWS.
+    It uses credentials stored in a Kubernetes secret for authentication and configuration of AWS and ROSA.
+    Once the cluster is provisioned, the task outputs a login command to access the newly created cluster, which can be used in subsequent pipeline steps.
   results:
     - name: ocp-login-command
       description: Command to log in to the newly ephemeral OpenShift cluster.
   params:
     - name: ocp-version
       type: string
-      description: The version of the OpenShift Container Platform (OCP) to deploy.
+      description: The version of the OpenShift Container Platform (OCP) to deploy. This will be used to fetch the corresponding HCP version for deployment.
     - name: cluster-name
       type: string
-      description: The name of the OpenShift cluster to be created.
+      description: The unique name of the OpenShift cluster to be created.
     - name: machine-type
       type: string
-      description: The type of AWS EC2 instance to use for the cluster nodes.
+      description: The AWS EC2 instance type to be used for the worker nodes of the OpenShift cluster (e.g., m5.xlarge).
     - name: replicas
       type: string
-      description: The number of worker nodes to provision in the cluster.
+      description: The number of worker nodes to provision in the cluster. Defaults to 3 worker nodes.
       default: '3'
     - name: konflux-test-infra-secret
       type: string
-      description: The name of secret where testing infrastructures credentials are stored.
+      description: The name of the Kubernetes secret that contains AWS and ROSA configuration credentials needed for cluster provisioning.
     - name: cloud-credential-key
       type: string
-      description: The key secret from konflux-test-infra-secret where all AWS ROSA configurations are stored.
+      description: The key within the secret where AWS ROSA configurations (e.g., credentials, roles) are stored.
   volumes:
     - name: konflux-test-infra-volume
       secret:
@@ -34,7 +39,7 @@ spec:
     - name: provision
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  konflux-test-infra-volume
+        - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       env:
         - name: CLUSTER_NAME
