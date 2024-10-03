@@ -101,7 +101,7 @@ spec:
             fi
 
             echo "[INFO] Waiting for cluster operators to be in 'Progressing=false' state..."
-            kubectl wait clusteroperators --all --for=condition=Progressing=false --timeout=60m > "$STATUS_LOG" 2>&1 || true
+            kubectl wait clusteroperators --all --for=condition=Progressing=false --timeout=60m > "$STATUS_LOG" 2>&1
             cat "$STATUS_LOG"
         }
 
