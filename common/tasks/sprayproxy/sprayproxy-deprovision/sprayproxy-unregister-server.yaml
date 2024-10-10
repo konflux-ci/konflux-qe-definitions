@@ -4,6 +4,10 @@ kind: Task
 metadata:
   name: sprayproxy-unregister-server
 spec:
+  description: |
+    The `sprayproxy-unregister-server` Task is designed to unregister Pipelines as Code (PAC) servers from the SprayProxy server.
+    It retrieves the list of currently registered PAC servers, checks their availability, and removes any unreachable PAC servers
+    from the SprayProxy backend. The task ensures that the server is unregistered cleanly and retries the operation if necessary.
   steps:
     - name: provision
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest

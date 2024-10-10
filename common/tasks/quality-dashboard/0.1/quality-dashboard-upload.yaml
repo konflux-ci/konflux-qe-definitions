@@ -4,6 +4,14 @@ kind: Task
 metadata:
   name: quality-dashboard-metrics
 spec:
+  description: |
+    The `quality-dashboard-metrics` Task uploads test execution metadata and reports to a quality dashboard API.
+    It collects information such as the job name, test event type (pull request or push event), and the test's
+    aggregate status (Succeeded, Failed, Completed, None). Based on the pipeline's result, it constructs a
+    `metadata.json` file with this data and sends it, along with any test report (e.g., "qd-report" or "e2e-report"),
+    to the quality dashboard. The task pulls artifacts from an ORAS container registry and ensures that the correct
+    reports are uploaded. If the pipeline succeeded, the status is marked as "success", otherwise, it is "failure"
+    or "aborted" depending on the pipeline's status.
   params:
     - name: test-name
       type: string
@@ -13,12 +21,14 @@ spec:
       description: The ORAS container used to store all test artifacts. From this container will generate one with test tag.
     - name: quality-dashboard-api
       type: string
+      description: The API URL for the quality dashboard.
       default: ""
     - name: pipeline-aggregate-status
       type: string
-      description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
+      description: The aggregate status of the pipeline (Succeeded, Failed, Completed, None).
       default: None
     - name: test-event-type
+      type: string
       description: Indicates if the job is triggered by a Pull Request or a Push event.
   steps:
     - name: quality-dashboard-metadata
@@ -40,21 +50,21 @@ spec:
       script: |
         #!/bin/bash
 
-        # In case is coming from /retest event then it's a pull_request
-        # if event type is not push and pull_request_number is not empty then is a pull_request
+        # Set the event type to "pull_request" if it's not a push and has a PR number
         if [ "$EVENT_TYPE" != "push" ] && [ -n "$PULL_REQUEST_NUMBER" ]; then
           EVENT_TYPE="pull_request"
         fi
-        
+
+        # Determine the pipeline status based on the pipeline-aggregate-status param
         if [ "$(params.pipeline-aggregate-status)" == "Succeeded" ] || [ "$(params.pipeline-aggregate-status)" == "Completed" ]; then
           STATUS="success"
-        fi
-        if [ "$(params.pipeline-aggregate-status)" == "Failed" ]; then
+        elif [ "$(params.pipeline-aggregate-status)" == "Failed" ]; then
           STATUS="failure"
-        fi
-        if [ "$(params.pipeline-aggregate-status)" == "None" ]; then
+        elif [ "$(params.pipeline-aggregate-status)" == "None" ]; then
           STATUS="aborted"
         fi
+
+        # Create a metadata JSON file with test details
         CREATED_AT=$(eval date -u +"%Y-%m-%dT%H:%M:%SZ")
         METADATA_JSON=$(cat <<EOF
         {
@@ -74,22 +84,22 @@ spec:
         # Write the metadata JSON to a file
         echo "$METADATA_JSON" > metadata.json
 
-        # Print the content of the metadata.json file (for debugging purposes)
+        # Debug output: display the content of metadata.json
         echo "[INFO] metadata.json content:"
         cat metadata.json
         
+        # Pull test artifacts from the ORAS container
         oras pull "$(params.oci-container)"
         
-        # Try to get the first file starting with "qd-report"
+        # Look for report files (either "qd-report" or "e2e-report")
         QD_REPORT_FILENAME=$(find ./ -name "qd-report*" | head -1)
-
-        # If no "qd-report" file is found, get the first file starting with "e2e-report"
         if [ -z "$QD_REPORT_FILENAME" ]; then
             QD_REPORT_FILENAME=$(find ./ -name "e2e-report*" | head -1)
         fi
 
         echo "[INFO] Report filename: $QD_REPORT_FILENAME"
         
+        # Upload the metadata and report to the quality dashboard
         curl -F "metadata=@./metadata.json" \
           -F "xunit=@$QD_REPORT_FILENAME" \
           -X POST \

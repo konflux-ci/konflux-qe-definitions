@@ -1,9 +1,15 @@
----
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: collect-artifacts-deprovision-rosa
 spec:
+  description: |
+    This Tekton Task handles the collection of test artifacts and deprovisions the OpenShift cluster. The task performs the following steps:
+    1. **Collect Artifacts**: Gathers artifacts if the pipeline did not succeed.
+    2. **Inspect and Upload Artifacts**: Checks for sensitive information in the artifacts and uploads them to the OCI container registry.
+    3. **Deprovision ROSA Cluster**: Deletes the OpenShift cluster if specified.
+    4. **Remove Tags from Subnets**: Cleans up tags from AWS subnets associated with the cluster.
+    5. **Remove Load Balancers**: Deletes any associated AWS load balancers.
   params:
     - name: test-name
       type: string
@@ -13,34 +19,34 @@ spec:
       description: Command to log in to the OpenShift cluster.
     - name: oci-container
       type: string
-      description: The ORAS container registry URI to store artifacts.
+      description: The ORAS container registry URI where artifacts will be stored.
     - name: pull-request-author
       type: string
-      description: The GitHub username of the pull request author.
+      description: The GitHub username of the author of the pull request.
     - name: git-revision
       type: string
-      description: The Git revision (commit SHA) of the current build.
+      description: The Git revision (commit SHA) for the current build.
     - name: pull-request-number
       type: string
       description: The number of the GitHub pull request.
     - name: git-repo
       type: string
-      description: The name of the GitHub repository.
+      description: The name of the GitHub repository where the pull request was made.
     - name: git-org
       type: string
       description: The GitHub organization or user that owns the repository.
     - name: cluster-name
       type: string
-      description: The name of the OpenShift cluster to be deleted.
+      description: The name of the OpenShift cluster that is to be deleted.
     - name: konflux-test-infra-secret
       type: string
-      description: The name of secret where testing infrastructures credentials are stored.
+      description: The name of the secret containing credentials for testing infrastructure.
     - name: cloud-credential-key
       type: string
-      description: The key secret from konflux-test-infra-secret where all AWS ROSA configurations are stored.
+      description: The key within the konflux-test-infra secret where AWS ROSA configuration details are stored.
     - name: pipeline-aggregate-status
       type: string
-      description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
+      description: The status of the pipeline (e.g., Succeeded, Failed, Completed, None).
       default: None
   volumes:
     - name: konflux-test-infra-volume
@@ -66,7 +72,7 @@ spec:
       onError: continue
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  konflux-test-infra-volume
+        - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       script: |
         #!/bin/sh
@@ -114,7 +120,7 @@ spec:
     - name: deprovision-rosa
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  konflux-test-infra-volume
+        - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       script: |
         set -o errexit
@@ -153,7 +159,7 @@ spec:
     - name: remove-tag-from-subnets
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  konflux-test-infra-volume
+        - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       script: |
         set -o errexit
@@ -191,7 +197,7 @@ spec:
     - name: remove-load-balancers
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  konflux-test-infra-volume
+        - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       script: |
         set -o errexit

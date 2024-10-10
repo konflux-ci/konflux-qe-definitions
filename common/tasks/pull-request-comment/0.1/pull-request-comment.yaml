@@ -4,32 +4,37 @@ kind: Task
 metadata:
   name: pull-request-commenter
 spec:
+  description: |
+    The `pull-request-commenter` Task posts a comment on a GitHub pull request indicating the status of a Tekton pipeline execution.
+    This task deletes any previous comments made by the pipeline and posts a new one, unless the pipeline was successful, in which case
+    it skips commenting. The comment includes a summary of the pipeline run status, links to build logs, and instructions for
+    re-running the tests or pulling down artifacts using ORAS.
   params:
     - name: test-name
       type: string
-      description: The name of the pipelinerun.
+      description: The name of the pipeline run being executed.
     - name: oci-container
       type: string
-      description: The ORAS container registry URI to store artifacts.
+      description: The ORAS container registry URI where the test artifacts are stored.
     - name: pull-request-author
       type: string
       description: The GitHub username of the pull request author.
     - name: pull-request-number
       type: string
-      description: The number of the GitHub pull request.
+      description: The GitHub pull request number to comment on.
     - name: git-repo
       type: string
-      description: The name of the GitHub repository.
+      description: The GitHub repository name where the pull request is opened.
     - name: git-org
       type: string
-      description: The GitHub organization or user that owns the repository.
+      description: The GitHub organization or user owning the repository.
     - name: pipeline-aggregate-status
       type: string
-      description: Contains status of a pipeline(Succeeded, Failed, Completed, None)
+      description: The aggregate status of the pipeline run (Succeeded, Failed, Completed, None).
       default: None
     - name: git-revision
       type: string
-      description: "Git commit revision from Snapshot."
+      description: The Git commit revision associated with the pull request.
   volumes:
     - name: konflux-test-infra-volume
       secret:
@@ -44,7 +49,7 @@ spec:
       workingDir: /workspace
       image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
       volumeMounts:
-        - name:  konflux-test-infra-volume
+        - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       script: |
         #!/bin/sh

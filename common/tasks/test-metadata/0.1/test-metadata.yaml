@@ -4,6 +4,12 @@ kind: Task
 metadata:
   name: test-metadata
 spec:
+  description: |
+    The `test-metadata` Task is responsible for gathering and processing metadata during the execution of a pipeline test.
+    It collects various Git and repository details, such as the type of event that triggered the pipeline (Push or Pull Request),
+    the Git URL and revision, and details about the container image built during the test.
+    The task processes metadata labels and annotations, constructs a job specification for the Konflux CI system,
+    and writes this information to specified results.
   results:
     - name: test-event-type
       description: Indicates if the job is triggered by a Pull Request or a Push event.
@@ -22,11 +28,11 @@ spec:
     - name: pull-request-author
       description: The GitHub author of the pull request event.
     - name: job-spec
-      description: The konflux ci job spec metadata generated.
+      description: The Konflux CI job spec metadata generated.
     - name: source-repo-url
-      description: Will show the source from where a Pull Request was open. Can be fork or upstream.
+      description: Will show the source from where a Pull Request was opened. Can be from a fork or upstream.
     - name: source-repo-branch
-      description: Get the branch from the fork or upstream repo where pipeline is executed.
+      description: Get the branch from the fork or upstream repo where the pipeline is executed.
   params:
     - name: SNAPSHOT
       description: The JSON string of the Snapshot under test.
