@@ -89,7 +89,7 @@ spec:
               max_retries=25
               # if the operator is not available, wait 60s and check again
               while [ "$retries" -lt "$max_retries" ]; do
-                  available=$(kubectl get co "$operator" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')
+                  available=$(kubectl get co "$operator" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || echo "False")
                   if [ "$available" == "True" ]; then
                       break
                   fi
