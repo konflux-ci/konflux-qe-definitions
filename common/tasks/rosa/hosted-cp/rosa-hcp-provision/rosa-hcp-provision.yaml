@@ -122,11 +122,6 @@ spec:
             fi
         }
 
-        # Function to check if the API server is ready
-        check_api_server() {
-          kubectl get nodes >/dev/null 2>/dev/null || true
-        }
-
         deploy_cluster() {
             printf "INFO: Log in to your Red Hat account...\n" 
             config_aws_creds
@@ -179,22 +174,9 @@ spec:
 
             #Workaround: Check if apiserver is ready by calling kubectl get nodes
             printf "INFO: Check if apiserver is ready...\n"
-            # Timeout loop to wait for the API server to be ready
-            timeout 300s bash -c '
-            while true; do
-              if check_api_server; then
-                echo "API server is ready"
-                exit 0
-              else
-                echo -n "."  # Print a dot to indicate progress
-                sleep 10
-              fi
-            done
-            '
-
-            if [ $? -ne 0 ]; then
-              echo "ERROR: API server is not ready" >&2
-              exit 1
+            if ! timeout 300s bash -c "while ! kubectl get nodes >/dev/null 2>/dev/null; do printf '.'; sleep 10; done"; then
+                echo "ERROR: API server is not ready" >&2
+                exit 1
             fi
             check_clusteroperators
         }
