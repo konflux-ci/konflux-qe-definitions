@@ -37,7 +37,7 @@ if [[ -n "$CLUSTER_LIST" ]]; then
             echo -e "[INFO] Cluster with id: ${id} is older than 4 hours. Attempting to delete..."
 
             for ((i=1; i<=MAX_RETRIES; i++)); do
-                if rosa delete cluster -y "$id"; then
+                if rosa delete cluster --cluster="$id" -y; then
                     echo "[SUCCESS] Cluster with id: ${id} deleted successfully."
                     break
                 else
