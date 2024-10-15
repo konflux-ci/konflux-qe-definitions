@@ -13,8 +13,8 @@ if [[ -z "$ROSA_TOKEN" ]]; then
     exit 1
 fi
 
-if [[ -z "$AWS_DEFAULT_REGION" || -z "$AWS_ACCESS_KEY_ID" || -z "$AWS_SECRET_ACCESS_KEY" ]]; then
-    echo "[ERROR] Required AWS env vars are not exported. Be sure to export \$AWS_DEFAULT_REGION, \$AWS_ACCESS_KEY_ID, \$AWS_SECRET_ACCESS_KEY"
+if [[ -z "$AWS_DEFAULT_REGION" || -z "$AWS_ACCESS_KEY_ID" || -z "$AWS_SECRET_ACCESS_KEY" || -z "$AWS_SUBNET_IDS" ]]; then
+    echo "[ERROR] Required AWS env vars are not exported. Be sure to export \$AWS_DEFAULT_REGION, \$AWS_ACCESS_KEY_ID, \$AWS_SECRET_ACCESS_KEY, \$AWS_SUBNET_IDS"
     exit 1
 fi
 
