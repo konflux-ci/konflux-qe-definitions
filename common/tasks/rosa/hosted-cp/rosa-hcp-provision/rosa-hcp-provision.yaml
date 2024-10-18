@@ -82,34 +82,29 @@ spec:
 
         # Even the cluster is shown ready on ocm side, and the cluster operators are available, some of the cluster operators are still progressing.
         check_clusteroperators() {
-          operators="dns ingress network image-registry"
-          for operator in $operators; do
-              # need to check if the operator is available or not in a loop
-              retries=0
-              max_retries=25
-              # if the operator is not available, wait 60s and check again
-              while [ "$retries" -lt "$max_retries" ]; do
-                  available=$(kubectl get co "$operator" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || echo "False")
-                  if [ "$available" == "True" ]; then
-                      break
-                  fi
-                  sleep 60
-                  retries=$((retries + 1))
-                  echo "Retried $retries times..."
-              done
-              # if the operator is still not available after 10 times, exit 1
-              if [ "$retries" -eq "$max_retries" ]; then
-                  echo "Operator $operator is not available" >&2
-                  # print the status of all cluster operators
-                  kubectl get co
-                  # print the status of the failed cluster operator
-                  kubectl get co "$operator" -o yaml
-                  exit 1
-              fi
-          done
-          echo "Operators [${operators}] are available"
-          # for debugging purpose
-          kubectl get co
+            local STATUS_LOG="co_status.log"
+            local max_attempts=10
+            local attempt
+            echo "[INFO] Checking cluster operators' status..."
+            # retrying to get clusteroperator. Makes sense in case master nodes are not ready
+            for attempt in $(seq 1 $max_attempts); do
+                echo "[INFO] Attempt $attempt/$max_attempts"
+                if kubectl get clusteroperators -A > "$STATUS_LOG" 2>&1; then
+                    cat "$STATUS_LOG"
+                    echo "[INFO] Cluster operators are accessible."
+                    break
+                fi
+                echo "[INFO] Attempt $attempt failed, retrying in 10 seconds..."
+                sleep 10
+            done
+            if [ $attempt -eq $max_attempts ]; then
+                echo "[ERROR] All attempts to access cluster operators failed. Check $STATUS_LOG for details."
+                cat "$STATUS_LOG"
+                return 1
+            fi
+            echo "[INFO] Waiting for cluster operators to be in 'Progressing=false' state..."
+            kubectl wait clusteroperators --all --for=condition=Progressing=false --timeout=60m > "$STATUS_LOG" 2>&1
+            cat "$STATUS_LOG"
         }
 
         get_hcp_full_version() {
