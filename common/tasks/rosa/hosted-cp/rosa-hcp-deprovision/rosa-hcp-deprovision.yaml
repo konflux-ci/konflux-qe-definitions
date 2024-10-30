@@ -20,21 +20,6 @@ spec:
     - name: oci-container
       type: string
       description: The ORAS container registry URI where artifacts will be stored.
-    - name: pull-request-author
-      type: string
-      description: The GitHub username of the author of the pull request.
-    - name: git-revision
-      type: string
-      description: The Git revision (commit SHA) for the current build.
-    - name: pull-request-number
-      type: string
-      description: The number of the GitHub pull request.
-    - name: git-repo
-      type: string
-      description: The name of the GitHub repository where the pull request was made.
-    - name: git-org
-      type: string
-      description: The GitHub organization or user that owns the repository.
     - name: cluster-name
       type: string
       description: The name of the OpenShift cluster that is to be deleted.
