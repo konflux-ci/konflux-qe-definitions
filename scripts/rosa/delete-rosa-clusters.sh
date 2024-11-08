@@ -61,16 +61,35 @@ delete_load_balancers() {
     local lb_tag_value=$1
     local load_balancers
     local lb_arn
-    
+
     load_balancers=$(aws --region "$AWS_DEFAULT_REGION" elbv2 describe-load-balancers --query "LoadBalancers[*].LoadBalancerArn" --output text)
 
     for lb_arn in $load_balancers; do
         local tags
         tags=$(aws --region "$AWS_DEFAULT_REGION" elbv2 describe-tags --resource-arns "$lb_arn" --query "TagDescriptions[*].Tags[?Key=='$LB_TAG_KEY'&&Value=='$lb_tag_value'].Value" --output text)
+        
         if [[ "$tags" == "$lb_tag_value" ]]; then
+
             echo "[INFO] Deleting ELBv2 Load Balancer with ARN: $lb_arn"
             aws --region "$AWS_DEFAULT_REGION" elbv2 delete-load-balancer --load-balancer-arn "$lb_arn"
+
+            echo "[INFO] Deleting Target Groups associated with Load Balancer ARN: $lb_arn"
+            delete_target_groups_for_lb "$lb_arn"
         fi
+    done
+}
+
+delete_target_groups_for_lb() {
+    local lb_arn=$1
+    local tg_arns
+
+    # Get target groups associated with the specified load balancer
+    tg_arns=$(aws elbv2 describe-target-groups --region "$AWS_DEFAULT_REGION" \
+        --query "TargetGroups[?LoadBalancerArns[0] == '$lb_arn'].TargetGroupArn" --output text)
+
+    for tg_arn in $tg_arns; do
+        echo "[INFO] Deleting Target Group with ARN: $tg_arn (associated with Load Balancer ARN: $lb_arn)"
+        aws elbv2 delete-target-group --target-group-arn "$tg_arn" --region "$AWS_DEFAULT_REGION"
     done
 }
 
@@ -105,6 +124,7 @@ delete_old_clusters() {
 main() {
     check_env_vars
     check_required_tools
+
     rosa login --token="${ROSA_TOKEN}"
 
     local cluster_list
