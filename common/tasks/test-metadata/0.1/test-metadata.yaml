@@ -33,6 +33,8 @@ spec:
       description: Will show the source from where a Pull Request was opened. Can be from a fork or upstream.
     - name: source-repo-branch
       description: Get the branch from the fork or upstream repo where the pipeline is executed.
+    - name: component-name
+      description: The name of the component that is being executed from Konflux.
   params:
     - name: SNAPSHOT
       description: The JSON string of the Snapshot under test.
@@ -138,3 +140,4 @@ spec:
         echo -n "$JOB_SPEC" > $(results.job-spec.path)
         echo -n "$SOURCE_REPO_URL" > $(results.source-repo-url.path)
         echo -n "$SOURCE_REPO_BRANCH" > $(results.source-repo-branch.path)
+        echo -n "$KONFLUX_COMPONENT_NAME" > $(results.component-name.path)
