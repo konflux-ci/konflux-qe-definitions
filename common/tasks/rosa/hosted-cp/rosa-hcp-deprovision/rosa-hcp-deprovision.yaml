@@ -67,7 +67,13 @@ spec:
             exit 0
         fi
 
-        leaktk scan --kind Files --resource /workspace | leaktk-remove-files /workspace
+        trufflehog filesystem /workspace --only-verified --fail
+        EXIT_CODE=$?
+
+        if [ $EXIT_CODE -ne 0 ]; then
+            echo -e "[ERROR]: Found secrets in artifacts... Container artifacts will not be uploaded to OCI registry due to security reasons."
+            exit 1
+        fi
 
         OCI_STORAGE_USERNAME="$(jq -r '."quay-username"' /usr/local/konflux-test-infra/oci-storage)"
         OCI_STORAGE_TOKEN="$(jq -r '."quay-token"' /usr/local/konflux-test-infra/oci-storage)"
