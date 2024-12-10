@@ -6,7 +6,7 @@ spec:
   description: >-
     This StepAction runs "analyze-test-results" command from qe-tools binary against supplied
     OCI artifact that contains logs and test results.
-  image: quay.io/konflux-ci/qe-tools:KFLUXDP-42
+  image: quay.io/konflux-ci/qe-tools:latest
   params:
     - name: workspace-path
       type: string
