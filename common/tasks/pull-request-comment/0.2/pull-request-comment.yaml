@@ -137,7 +137,7 @@ spec:
         export INTEGRATION_TEST_CONSOLE_URL="${BUILD_CONSOLE_URL%/*}/$(params.test-name)"
 
         # Store the content of the test results analysis (from a previous step) in a variable
-        TEST_RESULTS_ANALYSIS=$(cat analysis.md)
+        TEST_RESULTS_ANALYSIS=$(cat analysis.md || echo "\<not enabled\>")
 
         PR_COMMENT=$(cat <<EOF
         @${PR_AUTHOR}: The following test has ${PIPELINE_RUN_AGGREGATE_STATUS}, say **/retest** to rerun failed tests.
@@ -157,7 +157,7 @@ spec:
         oras pull $OCI_STORAGE_CONTAINER
         \`\`\`
         ### Test results analysis
-        $TEST_RESULTS_ANALYSIS
+        ${TEST_RESULTS_ANALYSIS}
         EOF
         )
         # Combine body components into the final JSON body
