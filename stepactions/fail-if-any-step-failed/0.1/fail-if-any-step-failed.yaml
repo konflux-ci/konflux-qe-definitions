@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1alpha1
+kind: StepAction
+metadata:
+  name: fail-if-any-step-failed
+spec:
+  description: |
+    This StepAction searches for exit codes (/tekton/steps/<step-name>/exitCode) in each step within the Task and fails if it detects that any `exitCode != "0"`
+  image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+  script: |
+    #!/bin/bash
+    set -e
+
+    # Loop through "exitCode" files containing exit codes of all executed steps within the Task
+    find -L "/tekton/steps/" -path "*/step-*/exitCode" | while read -r file; do
+        exitCode=$(<"$file")
+
+        # If some of the steps exited with non-zero code, exit the script with that code
+        if [ "$exitCode" != "0" ]; then
+            stepname=${file##*step-}
+            stepname=${stepname%%/*}
+            echo -e "[ERROR]: Step '$stepname' failed with exit code '$exitCode', which was previously ignored - exiting now"
+            exit $exitCode
+        fi
+    done
+
+    echo -e "[INFO]: Did not find any failed steps"
