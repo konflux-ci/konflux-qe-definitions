@@ -8,6 +8,7 @@ spec:
     The task takes several parameters, including the OpenShift version, AWS machine type, and cluster name, to configure and deploy the cluster on AWS.
     It uses credentials stored in a Kubernetes secret for authentication and configuration of AWS and ROSA.
     Once the cluster is provisioned, the task outputs a login command to access the newly created cluster, which can be used in subsequent pipeline steps.
+    The logs from cluster provisioning are than scanned for leaked credentials and pushed to specified OCI artifact
   results:
     - name: ocp-login-command
       description: Command to log in to the newly ephemeral OpenShift cluster.
@@ -54,9 +55,7 @@ spec:
         - name: MACHINE_TYPE
           value: "$(params.machine-type)"
       script: |
-        set -o errexit
-        set -o nounset
-        set -o pipefail
+        set -euo pipefail
 
         export ROSA_TOKEN AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY BILLING_ACCOUNT_ID AWS_OIDC_CONFIG_ID OPERATOR_ROLES_PREFIX \
               SUBNET_IDS INSTALL_ROLE_ARN SUPPORT_ROLE_ARN WORKER_ROLE_ARN REGION

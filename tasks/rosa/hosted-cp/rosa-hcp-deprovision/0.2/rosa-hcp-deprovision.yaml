@@ -79,9 +79,7 @@ spec:
         - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       script: |
-        set -o errexit
-        set -o nounset
-        set -o pipefail
+        set -euo pipefail
 
         export CLUSTER_NAME REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY ROSA_TOKEN
 
@@ -119,9 +117,7 @@ spec:
         - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       script: |
-        set -o errexit
-        set -o nounset
-        set -o pipefail
+        set -euo pipefail
 
         CLUSTER_NAME=$(params.cluster-name)
         REGION=$(jq -r '.aws["region"]' /usr/local/konflux-test-infra/$(params.cloud-credential-key))
@@ -158,9 +154,7 @@ spec:
         - name: konflux-test-infra-volume
           mountPath: /usr/local/konflux-test-infra
       script: |
-        set -o errexit
-        set -o nounset
-        set -o pipefail
+        set -euo pipefail
 
         export CLUSTER_NAME REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 
