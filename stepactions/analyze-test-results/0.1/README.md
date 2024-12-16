@@ -1,6 +1,8 @@
 # analyze-test-results stepaction
 
 This StepAction runs "analyze-test-results" command from qe-tools binary against supplied OCI artifact that contains logs and test results.
+The command then tries to identify the cause of the failure and provides the result of the analysis in the specified file.
+([Link to the code](https://github.com/konflux-ci/qe-tools/blob/main/cmd/root.go)).
 
 ## Parameters
 |name|description|default value|required|
