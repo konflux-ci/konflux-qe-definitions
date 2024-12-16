@@ -11,6 +11,8 @@ ARG ROSA_VERSION=v1.2.47
 ARG JQ_VERSION=1.6
 # renovate: datasource=github-releases depName=mikefarah/yq
 ARG YQ_VERSION=4.43.1
+# renovate: datasource=github-releases depName=sigstore/cosign
+ARG COSIGN_VERSION=v2.4.1
 
 ARG ORAS_VERSION=1.2.0
 
@@ -21,7 +23,10 @@ ARG GOLANGCI_LINT_VERSION="v1.59.0"
 
 ARG LEAKTK_TAG="v0.0.13"
 
-# Download and install golangci-lint
+RUN curl -L "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" -o /usr/local/bin/cosign && \
+    chmod +x /usr/local/bin/cosign && \
+    cosign version
+
 RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s ${GOLANGCI_LINT_VERSION} && \
     cp bin/golangci-lint /usr/local/bin && \
     golangci-lint --version
@@ -87,6 +92,7 @@ COPY --from=builder /usr/local/bin/leaktk-remove-files /usr/local/bin/leaktk-rem
 COPY --from=builder /usr/local/bin/shellcheck /usr/local/bin/shellcheck
 COPY --from=builder /usr/local/bin/golangci-lint /usr/local/bin/golangci-lint
 COPY --from=builder /usr/local/bin/tkn /usr/local/bin/tkn
+COPY --from=builder /usr/local/bin/cosign /usr/local/bin/cosign
 
 RUN curl -L https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && \
     unzip awscliv2.zip && \
