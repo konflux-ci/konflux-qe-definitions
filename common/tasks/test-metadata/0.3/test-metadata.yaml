@@ -78,6 +78,7 @@ spec:
               fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/source-branch']
       script: |
         #!/bin/bash
+        set -euo pipefail
 
         # Extract additional environment variables from SNAPSHOT
         GIT_URL=$(jq -r --arg component_name "$KONFLUX_COMPONENT_NAME" '.components[] | select(.name == $component_name) | .source.git.url' <<< "$SNAPSHOT")
@@ -109,7 +110,7 @@ spec:
         SL_BUILD_NAME="$(jq -r \
             '.payload | @base64d | fromjson | .predicate.buildConfig.tasks[] |
             select(.invocation.environment.labels."konflux-ci/sealights" == "true")
-            | .results[] | select(.name == "build-name") | .value' \
+            | .results[] | select(.name == "sealights-build-name") | .value' \
             cosign_metadata.json)"
 
         SOURCE_ARTIFACT="$(jq -r \
@@ -137,7 +138,7 @@ spec:
             "container_image": "$COMPONENT_CONTAINER_IMAGE",
             "konflux_component": "$KONFLUX_COMPONENT_NAME",
             "source-artifact": "$SOURCE_ARTIFACT",
-            "cachi2-artifact": "$CACHI2_ARTIFACT"
+            "cachi2-artifact": "$CACHI2_ARTIFACT",
             "git": {
                 "pull_request_number": $PULL_REQUEST_NUMBER,
                 "pull_request_author": "$PR_AUTHOR",
@@ -147,7 +148,7 @@ spec:
                 "event_type": "$EVENT_TYPE",
                 "source_repo_url": "$SOURCE_REPO_URL",
                 "source_repo_branch": "$SOURCE_REPO_BRANCH"
-            },
+            }
         }
         EOF
         )
