@@ -53,7 +53,7 @@ spec:
           - name: revision
             value: main
           - name: pathInRepo
-            value: common/stepactions/analyze-test-results/0.1/analyze-test-results.yaml
+            value: stepactions/analyze-test-results/0.1/analyze-test-results.yaml
       params:
         - name: workspace-path
           value: /workspace
